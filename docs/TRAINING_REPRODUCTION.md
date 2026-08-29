@@ -2,7 +2,7 @@
 
 Esto documenta exactamente los pasos que se corrieron para llegar a `training/data/reports/eval_v1.md`. Sirve tanto para repetirlo con el dataset sintético de prueba como, en una máquina con internet completo, para correrlo con Mozilla Common Voice de verdad.
 
-**Estado actual: `eval_v1.md` ya viene de una corrida con datos reales** (Common Voice 26.0, español mexicano, 500 clips: 350 train / 75 val / 75 test), no del dataset sintético. Resultado: 94.67% accuracy, F1 0.9429, peso combinado de F0 de 33.7% (bien debajo del 60% de advertencia). La sección 2A de abajo documenta cómo se descargó.
+**Estado actual: `eval_v1.md` viene de 5,000 clips reales (Common Voice 26.0, español mexicano) + 800 sintéticos decorrelacionados** (secciones 2A y 2C). 97.47% accuracy, F1 0.9749, peso combinado de F0 de 32.5%, 100% en la prueba de estrés adversarial sintética. **Pero, importante:** hay un caso real conocido y sin resolver donde el modelo sigue fallando (voz actuada con tono forzado sin trabajar resonancia), documentado a fondo en la sección 4.3/4.4 más abajo. No lo omitas si vas a confiar en este modelo para algo serio.
 
 ## 1. Preparar el entorno
 
@@ -45,6 +45,24 @@ python scripts/02_prepare_labels.py --lang es-mx
 `01_download_dataset.py` transmite y descomprime cada `.tar.gz` al vuelo (sin bajar el archivo completo a disco) y se detiene apenas junta `--max-rows / 2` clips de cada género; los datasets completos pesan ~1.8GB y ~2GB cada uno, así que para una corrida de validación no hace falta bajarlos enteros. Si más adelante se quiere entrenar con más datos, basta con subir `--max-rows` (a costa de más tiempo de descarga).
 
 Si se quiere usar un dataset distinto de MDC (otro idioma, otra versión), hay que editar `DEFAULT_DATASETS` en el script con el (etiqueta de género, dataset id) correspondiente; el id es el que aparece en la URL de la página del dataset.
+
+## 2C. Mezclar con ejemplos sintéticos decorrelacionados (recomendado, ver sección 4.3/4.4)
+
+Después de encontrar que el modelo entrenado solo con voz real usa el tono como atajo (sección 4.3), se agregó un generador de ejemplos sintéticos donde tono y formantes varían de forma **independiente** (a diferencia de `_dev_synthetic_dataset.py`, donde siguen yendo de la mano), etiquetados estrictamente por los formantes. Mezclarlos con los datos reales fuerza al modelo a no depender solo del tono.
+
+```bash
+cd training
+python scripts/_dev_synthetic_decorrelated.py --n-per-combo 200
+
+# Pega las filas sintéticas al final del manifest real (sin repetir el header)
+tail -n +2 data/raw/manifest_synthetic_decorrelated.csv >> data/raw/manifest_es-mx.csv
+
+python scripts/02_prepare_labels.py --lang es-mx
+```
+
+`02_prepare_labels.py` no necesita cambios: balancea y separa train/val/test sobre lo que haya en el manifest, sin distinguir origen real vs. sintético. Como se agrega la misma cantidad a cada género (2 de las 4 combinaciones son "femenino", 2 son "masculino"), el balance de clases no se distorsiona.
+
+`05_evaluate_model.py` detecta automáticamente las filas sintéticas decorrelacionadas en el test set (por el nombre del archivo) y reporta accuracy por separado sobre los casos "adversariales" (tono y formantes en direcciones opuestas), no solo la importancia global de F0. Es la prueba de estrés real del principio central del proyecto, corriendo en cada evaluación, no un script manual aparte.
 
 ## 2B. Con el dataset sintético de prueba — sin internet
 
@@ -99,6 +117,40 @@ Con el modelo entrenado sobre 500 clips reales (ver sección 2A), se probó manu
 La grabación grave tiene formantes objetivamente más "grandes" (más asociados a resonancia percibida como femenina) que la aguda, y aun así puntuó mucho más bajo. Esto contradice el principio central del proyecto para este caso puntual, aunque el peso global de F0 reportado por `05_evaluate_model.py` (33.7%) esté debajo del umbral de advertencia (60%): un promedio global sobre el test set no garantiza el comportamiento en casos fuera de lo típico del dataset (voz actuada deliberadamente en falsete/pecho, poco representada en solo 350 ejemplos de entrenamiento).
 
 Esto motivó reentrenar con más datos (sección 2A, `--max-rows` más alto). Si el problema persiste con más datos, valdría la pena revisar si LightGBM (que ganó por poco sobre logreg en la comparación de `04_train_model.py`) está sobreajustando a F0 en datasets chicos, o si hace falta penalizar explícitamente las features de F0 en el entrenamiento.
+
+## 4.4. Más datos reales no lo arregló; datos sintéticos decorrelacionados tampoco (para este caso)
+
+Se probaron tres modelos contra las dos grabaciones reales exactas de la sección 4.3 (mismos 12 valores de features, sin volver a grabar):
+
+| Modelo | Aguda | Grave |
+|---|---|---|
+| 500 clips reales | 94.6 | 5.9 |
+| 5,000 clips reales (10x más datos, sin cambios de metodología) | 99.2 | 2.0 |
+| 5,000 reales + 800 sintéticos decorrelacionados (`_dev_synthetic_decorrelated.py`, sección 2C) | 99.7 | 2.0 |
+
+**Más datos reales empeoró el problema, no lo arregló.** La hipótesis: en voz real, tono y resonancia van correlacionados de forma natural (quien tiene voz más aguda de forma natural también suele tener un tracto vocal más corto). Meterle más voz real solo le dio al modelo más evidencia de esa correlación, reforzando el atajo "tono alto = femenino" en vez de debilitarlo.
+
+**Mezclar datos sintéticos decorrelacionados tampoco lo arregló**, a pesar de llegar a 100% de accuracy en la prueba de estrés automática sobre esos mismos ejemplos sintéticos (ver el chequeo nuevo en `05_evaluate_model.py`). El modelo aprendió a resistir el atajo *dentro de las 4 combinaciones sintéticas exactas* que se le enseñaron, pero eso no generalizó a la grabación real, cuyos valores de features caen en un punto del espacio que no se parece lo suficiente a ninguna de esas 4 esquinas fijas (perfil de formantes "masculino" o "femenino" × rango de tono "grave" o "agudo").
+
+Hay algo más de fondo que vale la pena decir con claridad: **Common Voice es voz leída de forma natural por voluntarios, nadie ahí está practicando cambiar su registro de voz a propósito.** El caso de uso real de Crisantemo (alguien practicando deliberadamente separar tono de resonancia, con distintos niveles de habilidad/práctica) casi no tiene representación en ningún dataset de voz leída, sin importar cuánto volumen se le meta. Es un límite de fondo del tipo de dataset, no solo de tamaño.
+
+Caminos identificados para seguir desde aquí (sin explorar todavía, quedan como siguiente sesión):
+
+1. **Ampliar la generación sintética decorrelacionada** de 4 combinaciones fijas a un muestreo continuo e independiente de tono y formantes en rangos amplios, para cubrir mejor el espacio real de features en vez de solo 4 esquinas exactas.
+2. **Conseguir datos de voz practicada/actuada de verdad**, no solo lectura natural. Ninguna cantidad de Common Voice va a tener esto; haría falta una fuente de datos distinta (o generar activamente ejemplos con voluntarios, con todo el cuidado ético que implica pedirle a alguien que grabe su voz para este propósito específico, ver docs/ETHICS_PRIVACY.md).
+3. Revisar si vale la pena una arquitectura híbrida: que el score no dependa 100% de un modelo de caja negra, sino que le dé un piso/techo garantizado a las features de resonancia sobre el tono (una regla explícita, no aprendida).
+
+## 4.5. Por qué, en realidad: F0 casi separa solo, los formantes por sí solos casi no
+
+`training/notebooks/feature_analysis.ipynb` (análisis exploratorio sobre las 5,000 filas reales) da la respuesta cuantitativa a por qué pasa esto, y corrige la hipótesis de la sección 4.4:
+
+- **F0 por sí solo tiene AUC 0.97** clasificando género en este dataset (casi perfecto). **Los formantes por sí solos tienen AUC 0.57-0.73** (apenas mejor que azar en algunos casos). Las distribuciones de F1/F2/F3/F2-F1/F3-F2 por género se traslapan muchísimo; la de F0 casi no se traslapa.
+- La correlación entre F0 y los formantes es en realidad **débil** (r=0.10 a 0.37, no la "correlación natural fuerte" que se asumió en la sección 4.4). El problema no es que tono y resonancia vayan de la mano en los datos: es que los formantes, calculados como promedio simple sobre toda la grabación, casi no separan las clases por sí solos en este dataset. El modelo no "prefiere" el atajo del tono por pereza, es la señal objetivamente más fuerte disponible.
+- Las grabaciones de tono agudo actuado (320-356 Hz) están **fuera del rango de F0 que el modelo vio en entrenamiento** (que casi no pasa de 300 Hz). No es que el modelo ignore los formantes ahí: está extrapolando a una zona de tono nunca vista, y lo único que sabe hacer con tonos muy altos es "más femenino". Esto también explica por qué mezclar sintéticos decorrelacionados (sección 4.4) no ayudó: sus rangos de F0 (85-140 y 170-260) tampoco cubren esa zona extrema.
+
+Ver el notebook para las gráficas completas (distribución por feature, matriz de correlación, AUC univariado, y dónde caen los 5 casos de prueba reales sobre la nube de entrenamiento) y las conclusiones con los próximos pasos concretos identificados.
+
+**Decisión tomada por ahora:** se dejó el modelo de 5,000 reales + sintéticos decorrelacionados como `models/crisantemo_v1.joblib` (mejor accuracy general, 97.47%, y el chequeo automático de estrés adversarial ya vive en `05_evaluate_model.py` para cualquier reentrenamiento futuro), sabiendo que el caso específico de voz actuada con tono forzado sigue sin resolverse. No se revirtió a un modelo anterior porque ninguno de los tres resuelve el problema real; se prefirió quedarse con el de mejor accuracy general mientras se decide la estrategia de fondo.
 
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 

@@ -8,3 +8,4 @@ training/data/raw/
 models/*.onnx
 *.egg-info/
 CLAUDE.md
+.ipynb_checkpoints/
