@@ -5,4 +5,6 @@ pydantic-settings>=2.5
 joblib>=1.4
 scikit-learn>=1.5
 numpy>=1.26
-webrtcvad>=2.0.10
+
+# webrtcvad>=2.0.10 se agrega hasta Fase 4 (VAD del modo streaming); Fase 2
+# no lo usa (extract_features ya filtra silencio con MIN_VOICED_SECONDS).
