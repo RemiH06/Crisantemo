@@ -89,7 +89,7 @@ def main() -> None:
                 signal = synth_vowel(f0, profile["formants"], profile["bandwidth"], rng)
                 file_path = out_dir / f"{gender}_{i:04d}.wav"
                 sf.write(file_path, signal, SAMPLE_RATE)
-                writer.writerow([str(file_path), gender, "", f"synthetic_{label}"])
+                writer.writerow([str(file_path.relative_to(RAW_DIR)), gender, "", f"synthetic_{label}"])
                 rows_written += 1
 
     print(f"Generadas {rows_written} voces sintéticas -> {manifest_path}")

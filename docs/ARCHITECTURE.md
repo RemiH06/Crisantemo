@@ -46,22 +46,14 @@ El backend siempre calcula y expone el score numérico crudo (0-100) más el des
 - `.env.example` y `.gitignore`.
 - `shared/acoustic_features` implementado y probado con un tono sintético.
 
-**Fase 1 (pipeline de entrenamiento): mecánica completada y validada; entrenamiento con datos reales pendiente.**
-- Los 6 scripts (`01_download_dataset.py` a `06_export_model.py`) están escritos y listos para correr en un entorno con acceso a Hugging Face/Common Voice.
-- El entorno donde se desarrolló este proyecto no tiene acceso a internet general (solo a los registros de paquetes pip/npm, ni siquiera a Docker Hub), así que `01_download_dataset.py` no se pudo ejecutar aquí. Ver la nota de "Limitación de red" abajo.
-- Para validar que los scripts 02-06 funcionan de punta a punta, se construyó `_dev_synthetic_dataset.py`: un generador de voces sintéticas (pulsos glotales filtrados por resonadores de formantes) con dos clases separables tanto por pitch como por resonancia. No es voz real y no debe usarse para el modelo final, solo es un fixture de prueba.
-- Con ese dataset sintético, el pipeline completo corrió sin errores: preparación de labels, extracción de features (0 audios descartados), entrenamiento (logreg ganó sobre LightGBM en CV), evaluación y exportación del modelo calibrado a `models/crisantemo_v1.joblib`.
-- Resultado clave de la evaluación (`training/data/reports/eval_v1.md`): el peso combinado de las features de F0 en la decisión del modelo fue de 17.4%, dominado por formantes (F3, F2, distancia F2-F1). Esto es justo el comportamiento que el proyecto busca.
-- Prueba de estrés manual (voces sintéticas con pitch y resonancia en direcciones opuestas):
-
-  | Caso | score 0-100 |
-  |---|---|
-  | Grave + formantes masculinos (control) | 0.2 |
-  | Agudo + formantes femeninos (control) | 99.2 |
-  | Agudo pero formantes masculinos (imitando tono agudo) | 6.6 |
-  | Grave pero formantes femeninos (buena resonancia, pitch grave) | 93.8 |
-
-  El modelo, incluso entrenado solo con datos sintéticos, se guía por la resonancia y no se deja engañar por el pitch. Esto valida el diseño del vector de features; falta confirmar que se sostiene con voces humanas reales.
+**Fase 1 (pipeline de entrenamiento): completa, ya entrenado con datos reales.**
+- Los 6 scripts (`01_download_dataset.py` a `06_export_model.py`) corrieron de punta a punta con datos reales.
+- **Descubrimiento importante:** Common Voice se movió de Hugging Face a Mozilla Data Collective en octubre de 2025; el mirror en HF quedó vacío a propósito (no es un problema de red ni de permisos). `01_download_dataset.py` se reescribió para usar la API REST de MDC (`MDC_API_KEY`) en vez de `datasets.load_dataset`. Transmite y descomprime cada `.tar.gz` al vuelo, sin bajar el archivo completo a disco, deteniéndose apenas junta el número de filas pedido. Ver `docs/TRAINING_REPRODUCTION.md` sección 4.2 para el detalle.
+- Dataset usado: dos datasets curados por "MDC Curators", Common Voice Scripted Speech 26.0, español mexicano, ya filtrados por género autorreportado y solo audio validado (≥1 upvote, 0 downvotes), CC0-1.0. 500 clips en total (350 train / 75 val / 75 test), 0 audios descartados en la extracción de features.
+- Entrenamiento: LightGBM ganó sobre logreg en CV. Evaluación sobre el test set real: **94.67% accuracy, F1 0.9429**, matriz de confusión `[[38, 0], [4, 33]]`.
+- Resultado clave de la evaluación (`training/data/reports/eval_v1.md`): el peso combinado de las features de F0 fue de **33.7%**, bien debajo del umbral de advertencia (60%); `shimmer_local_pct` y `f0_mean_hz` fueron las features individuales más importantes, seguidas de formantes. El modelo no depende desproporcionadamente del pitch.
+- `docker-compose.yml`: se le agregó `env_file: .env` al servicio `training` (no lo tenía; sin eso `MDC_API_KEY` nunca le habría llegado al contenedor).
+- El dataset sintético (`_dev_synthetic_dataset.py`) sigue disponible como prueba de mecánica rápida sin internet (con dos clases separables por pitch y por resonancia, útil para pruebas de estrés dirigidas), pero ya no es la fuente de `eval_v1.md`.
 
 ## Fase 4 (modo en vivo): decisión de arquitectura
 

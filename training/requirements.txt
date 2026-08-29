@@ -1,5 +1,7 @@
-datasets>=2.20
-huggingface_hub>=0.24
+# Descarga desde Mozilla Data Collective (ver 01_download_dataset.py); ya no
+# se usa la librería `datasets` de Hugging Face, Common Voice se movió fuera
+# de HF en octubre de 2025.
+requests>=2.31
 pandas>=2.2
 pyarrow>=17.0
 scikit-learn>=1.5

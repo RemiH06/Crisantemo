@@ -16,7 +16,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from acoustic_features import FEATURE_NAMES, extract_features, load_audio_mono
-from common import PROCESSED_DIR
+from common import PROCESSED_DIR, RAW_DIR
 
 
 def extract_for_split(split_name: str) -> None:
@@ -27,7 +27,7 @@ def extract_for_split(split_name: str) -> None:
     skip_reasons: Counter[str] = Counter()
     for _, row in tqdm(manifest.iterrows(), total=len(manifest), desc=f"Features {split_name}"):
         try:
-            samples, sr = load_audio_mono(row["audio_path"])
+            samples, sr = load_audio_mono(RAW_DIR / row["audio_path"])
             feats = extract_features(samples, sr)
         except Exception as exc:  # audio corrupto, formato no soportado, o sin voz suficiente
             skip_reasons[type(exc).__name__] += 1

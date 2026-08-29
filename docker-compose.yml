@@ -44,5 +44,7 @@ services:
     volumes:
       - ./training/data:/app/data
       - ./models:/app/models
+    env_file:
+      - .env
     environment:
       FEATURE_SCHEMA_PATH: /app/models/feature_schema_v1.json
