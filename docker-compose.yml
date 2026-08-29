@@ -1,0 +1,48 @@
+name: crisantemo
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "9001:9001"
+    volumes:
+      - ./models:/app/models:ro
+    env_file:
+      - .env
+    environment:
+      MODEL_PATH: ${MODEL_PATH:-/app/models/crisantemo_v1.joblib}
+      FEATURE_SCHEMA_PATH: ${FEATURE_SCHEMA_PATH:-/app/models/feature_schema_v1.json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:9000}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9001/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "9000:5173"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:9001}
+      VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-ws://localhost:9001}
+    depends_on:
+      - backend
+
+  training:
+    build:
+      context: .
+      dockerfile: training/Dockerfile
+    profiles: ["training"]
+    ports:
+      - "9002:8888"
+    volumes:
+      - ./training/data:/app/data
+      - ./models:/app/models
+    environment:
+      FEATURE_SCHEMA_PATH: /app/models/feature_schema_v1.json

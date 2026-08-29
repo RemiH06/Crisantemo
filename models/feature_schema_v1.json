@@ -1,0 +1,18 @@
+{
+  "schema_version": "v1",
+  "model_version": "crisantemo_v1",
+  "feature_names": [
+    "f0_mean_hz",
+    "f0_std_hz",
+    "f0_range_semitones",
+    "f1_mean_hz",
+    "f2_mean_hz",
+    "f3_mean_hz",
+    "f2_f1_diff_hz",
+    "f3_f2_diff_hz",
+    "jitter_local_pct",
+    "shimmer_local_pct",
+    "hnr_db",
+    "spectral_centroid_mean_hz"
+  ]
+}
