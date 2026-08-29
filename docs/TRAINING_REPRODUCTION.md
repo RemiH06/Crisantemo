@@ -85,6 +85,21 @@ Si en tu máquina usas una versión de pandas distinta, este fix ya está aplica
 
 **4.2. Common Voice se movió fuera de Hugging Face.** La primera versión de `01_download_dataset.py` usaba `datasets.load_dataset("mozilla-foundation/common_voice_17_0", ...)`. Al intentarlo con datos reales, el dataset apareció vacío en Hugging Face sin importar el token usado; resultó ser que Mozilla movió la distribución completa de Common Voice a su propia plataforma (Mozilla Data Collective) en octubre de 2025, y el mirror en HF se quedó sin archivos a propósito. El script se reescribió por completo para usar la API de Mozilla Data Collective en su lugar (ver sección 2A). De paso, esto también hizo innecesarias las dependencias `datasets` y `huggingface_hub` en `training/requirements.txt` (se quitaron).
 
+## 4.3. Hallazgo con el modelo de 500 clips: sobrepeso de F0 en casos actuados
+
+Con el modelo entrenado sobre 500 clips reales (ver sección 2A), se probó manualmente con dos grabaciones de la misma persona, ambas voz actuada sin práctica previa (una aguda, una grave, sin esfuerzo de trabajar resonancia):
+
+| | Aguda (score 94.6) | Grave (score 5.8) |
+|---|---|---|
+| F0 | 321 Hz | 125 Hz |
+| F2-F1 (espaciado) | 666 Hz | **985 Hz** |
+| F3 | 2060 Hz | **2592 Hz** |
+| Brillo espectral | 794 Hz | **1106 Hz** |
+
+La grabación grave tiene formantes objetivamente más "grandes" (más asociados a resonancia percibida como femenina) que la aguda, y aun así puntuó mucho más bajo. Esto contradice el principio central del proyecto para este caso puntual, aunque el peso global de F0 reportado por `05_evaluate_model.py` (33.7%) esté debajo del umbral de advertencia (60%): un promedio global sobre el test set no garantiza el comportamiento en casos fuera de lo típico del dataset (voz actuada deliberadamente en falsete/pecho, poco representada en solo 350 ejemplos de entrenamiento).
+
+Esto motivó reentrenar con más datos (sección 2A, `--max-rows` más alto). Si el problema persiste con más datos, valdría la pena revisar si LightGBM (que ganó por poco sobre logreg en la comparación de `04_train_model.py`) está sobreajustando a F0 en datasets chicos, o si hace falta penalizar explícitamente las features de F0 en el entrenamiento.
+
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
 Para confirmar que el modelo usa resonancia y no solo pitch, se generaron cuatro voces sintéticas de control cruzando pitch y formantes en direcciones opuestas, y se les pidió el score al modelo crudo (antes de calibrar):

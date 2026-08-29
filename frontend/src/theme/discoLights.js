@@ -51,21 +51,27 @@ function makeLights(cols) {
  * Inicia la animación sobre el canvas dado. Se detiene sola si el canvas
  * se quita del DOM (requestAnimationFrame simplemente deja de tener sentido,
  * pero por prolijidad se expone una función de cleanup).
+ *
+ * Respeta prefers-reduced-motion: en vez del loop de animación, dibuja un
+ * solo cuadro estático (las luces siguen visibles, pero no se mueven). Si el
+ * usuario cambia esa preferencia del sistema en vivo, reacciona sin recargar.
  */
 export function initDiscoLights(canvas) {
   const ctx = canvas.getContext("2d");
   let width;
   let height;
-  let rafId;
+  let rafId = null;
 
   const lights = makeLights(LIGHTS_LIGHT);
+  const reducedMotionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
   function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
+    renderFrame(false);
   }
 
-  function draw() {
+  function renderFrame(animate) {
     ctx.clearRect(0, 0, width, height);
     const isDark = document.body.classList.contains("dark");
     const cols = isDark ? LIGHTS_DARK : LIGHTS_LIGHT;
@@ -74,12 +80,14 @@ export function initDiscoLights(canvas) {
       const l = lights[i];
       const c = cols[i];
 
-      l.x += l.vx;
-      l.y += l.vy;
-      if (l.x < -0.1) l.vx = Math.abs(l.vx);
-      if (l.x > 1.1) l.vx = -Math.abs(l.vx);
-      if (l.y < -0.1) l.vy = Math.abs(l.vy);
-      if (l.y > 1.1) l.vy = -Math.abs(l.vy);
+      if (animate) {
+        l.x += l.vx;
+        l.y += l.vy;
+        if (l.x < -0.1) l.vx = Math.abs(l.vx);
+        if (l.x > 1.1) l.vx = -Math.abs(l.vx);
+        if (l.y < -0.1) l.vy = Math.abs(l.vy);
+        if (l.y > 1.1) l.vy = -Math.abs(l.vy);
+      }
 
       const px = l.x * width;
       const py = l.y * height;
@@ -95,16 +103,37 @@ export function initDiscoLights(canvas) {
       ctx.fillStyle = gradient;
       ctx.fill();
     }
+  }
 
-    rafId = requestAnimationFrame(draw);
+  function loop() {
+    renderFrame(true);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function stopLoop() {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
+  function start() {
+    stopLoop();
+    if (reducedMotionQuery?.matches) {
+      renderFrame(false);
+    } else {
+      rafId = requestAnimationFrame(loop);
+    }
   }
 
   resize();
   window.addEventListener("resize", resize);
-  rafId = requestAnimationFrame(draw);
+  reducedMotionQuery?.addEventListener?.("change", start);
+  start();
 
   return function stop() {
-    cancelAnimationFrame(rafId);
+    stopLoop();
     window.removeEventListener("resize", resize);
+    reducedMotionQuery?.removeEventListener?.("change", start);
   };
 }

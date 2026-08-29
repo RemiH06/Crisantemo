@@ -86,6 +86,7 @@ El nombre viene del crisantemo, la flor que florece más tarde que las demás, e
 
 ## Próximas funcionalidades
 
+- Logo de Crisantemo (todavía no existe, la app usa solo texto)
 - Exportación del modelo a ONNX para reutilizarlo desde una app móvil
 - Historial de progreso por sesión de práctica
 - Soporte multi-idioma en la extracción de entonación

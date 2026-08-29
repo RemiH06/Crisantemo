@@ -345,3 +345,129 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════════════
+   ACCESIBILIDAD
+══════════════════════════════════════════════════════ */
+/* Visualmente oculto pero legible por lectores de pantalla (no display:none,
+   eso también lo oculta de la accesibilidad). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Foco visible consistente en toda la interfaz, en vez de depender del
+   estilo por default del navegador (que a veces se pierde contra fondos
+   personalizados). Solo con teclado (:focus-visible), no en cada click. */
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Quien pide menos movimiento en su sistema operativo no debería ver
+   transiciones ni animaciones (más allá de las luces disco, que se manejan
+   aparte en discoLights.js dibujando un solo cuadro estático). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   FLUJO DE GRABAR/SUBIR AUDIO
+══════════════════════════════════════════════════════ */
+.action-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.mono-time { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Barras de nivel en vivo durante la grabación, ver audio/visualizer.js.
+   Decorativas (aria-hidden), no dependen de JS para tener un tamaño válido. */
+.voice-bars {
+  display: block;
+  width: 100%;
+  height: 64px;
+  margin-bottom: 12px;
+}
+
+/* ══════════════════════════════════════════════════════
+   MEDIDOR DE SCORE — el degradado usa los colores de la
+   bandera trans (celeste/blanco/rosa) como la escala misma
+   del score, no como decoración. El número y el marcador de
+   posición no dependen de distinguir el color para leerse.
+══════════════════════════════════════════════════════ */
+.score-meter { margin: 4px 0 18px; }
+.score-meter-track {
+  position: relative;
+  height: 14px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    90deg,
+    #5BCEFA 0%,
+    #F5A9B8 35%,
+    #FFFFFF 50%,
+    #F5A9B8 65%,
+    #5BCEFA 100%
+  );
+}
+.score-meter-marker {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 4px; height: 26px;
+  background: var(--black);
+  border: 2px solid var(--white);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--black);
+}
+body.dark .score-meter-marker { background: var(--white); border-color: var(--black); box-shadow: 0 0 0 1px var(--white); }
+.score-meter-value {
+  margin-top: 10px;
+  font-size: 32px; font-weight: 700; letter-spacing: -.5px;
+  color: var(--text);
+}
+.score-meter-max { font-size: 16px; font-weight: 500; color: var(--text2); }
+
+/* ══════════════════════════════════════════════════════
+   DETAILS/SUMMARY — para el desglose completo de features
+══════════════════════════════════════════════════════ */
+details { margin: 14px 0; }
+summary {
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent);
+  padding: 4px 0;
+}
+details table { margin-top: 10px; }
+
+/* ══════════════════════════════════════════════════════
+   DESGLOSE DE FEATURES — una barra por feature, ver
+   components/featureBars.js
+══════════════════════════════════════════════════════ */
+.feature-bars { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.feature-bar-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 100px;
+  gap: 12px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .feature-bar-row { grid-template-columns: 1fr; gap: 4px; }
+}
+.feature-bar-label { font-size: 12px; color: var(--text2); }
+.feature-bar-track {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.feature-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; }
+.feature-bar-value { font-size: 12px; font-family: var(--mono); color: var(--text); text-align: right; }
+.feature-bar-unit { color: var(--text2); }
+@media (max-width: 600px) { .feature-bar-value { text-align: left; } }
+
+/* ══════════════════════════════════════════════════════
+   REPRODUCTOR DE LA GRABACIÓN
+══════════════════════════════════════════════════════ */
+.playback-audio { width: 100%; }
