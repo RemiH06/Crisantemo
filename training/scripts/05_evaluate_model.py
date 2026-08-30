@@ -37,16 +37,23 @@ F0_DOMINANCE_WARNING_THRESHOLD = 0.6
 # el atajo del tono, fallaría justo en estas. Es la prueba de estrés real del
 # principio central del proyecto, no solo un promedio global de importancia.
 DECORRELATED_MARKER = "synthetic_decorrelated"
-ADVERSARIAL_COMBOS = ("highf0_masculineformants", "lowf0_feminineformants")
+ADVERSARIAL_COMBOS = (
+    "highf0_masculineformants",
+    "very_highf0_masculineformants",
+    "lowf0_feminineformants",
+)
 ADVERSARIAL_ACCURACY_WARNING_THRESHOLD = 0.7
 
 
 def _combo_tag(audio_path: str) -> str | None:
     if DECORRELATED_MARKER not in audio_path:
         return None
+    # más específicos primero: "very_highf0_..." contiene "highf0_..." como substring
     for combo in (
         "lowf0_masculineformants",
         "lowf0_feminineformants",
+        "very_highf0_masculineformants",
+        "very_highf0_feminineformants",
         "highf0_masculineformants",
         "highf0_feminineformants",
     ):

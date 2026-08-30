@@ -2,7 +2,7 @@
 
 Esto documenta exactamente los pasos que se corrieron para llegar a `training/data/reports/eval_v1.md`. Sirve tanto para repetirlo con el dataset sintético de prueba como, en una máquina con internet completo, para correrlo con Mozilla Common Voice de verdad.
 
-**Estado actual: `eval_v1.md` viene de 5,000 clips reales (Common Voice 26.0, español mexicano) + 800 sintéticos decorrelacionados** (secciones 2A y 2C). 97.47% accuracy, F1 0.9749, peso combinado de F0 de 32.5%, 100% en la prueba de estrés adversarial sintética. **Pero, importante:** hay un caso real conocido y sin resolver donde el modelo sigue fallando (voz actuada con tono forzado sin trabajar resonancia), documentado a fondo en la sección 4.3/4.4 más abajo. No lo omitas si vas a confiar en este modelo para algo serio.
+**Estado actual: `eval_v1.md` viene de 5,000 clips reales + 3,000 sintéticos decorrelacionados con formantes variables** (secciones 2A, 2C, 4.6, 4.7). 85.15% accuracy, F1 0.8534, peso de F0 de 25.1%, 61.6% en la prueba de estrés adversarial sintética. **Importante:** la accuracy bajó a propósito respecto a versiones anteriores (que llegaban a 98% pero "hacían trampa", ver sección 4.7); el modelo actual mejora de verdad en voz actuada real (ver sección 4.8) pero **no lo resuelve del todo**, sigue sin resolverse por completo. No lo omitas si vas a confiar en este modelo para algo serio. Sesión en pausa aquí, continúa desde la sección 4.8.
 
 ## 1. Preparar el entorno
 
@@ -151,6 +151,43 @@ Caminos identificados para seguir desde aquí (sin explorar todavía, quedan com
 Ver el notebook para las gráficas completas (distribución por feature, matriz de correlación, AUC univariado, y dónde caen los 5 casos de prueba reales sobre la nube de entrenamiento) y las conclusiones con los próximos pasos concretos identificados.
 
 **Decisión tomada por ahora:** se dejó el modelo de 5,000 reales + sintéticos decorrelacionados como `models/crisantemo_v1.joblib` (mejor accuracy general, 97.47%, y el chequeo automático de estrés adversarial ya vive en `05_evaluate_model.py` para cualquier reentrenamiento futuro), sabiendo que el caso específico de voz actuada con tono forzado sigue sin resolverse. No se revirtió a un modelo anterior porque ninguno de los tres resuelve el problema real; se prefirió quedarse con el de mejor accuracy general mientras se decide la estrategia de fondo.
+
+## 4.6. Normalizar amplitud: probado, sin efecto (y por qué)
+
+Se agregó `normalize_amplitude()` a `shared/acoustic_features/io.py` (normaliza a un RMS de referencia, ver el código) por si el volumen de grabación estaba metiendo ruido a features como HNR/shimmer. Se reentrenó con esto activo: **resultado byte-idéntico al anterior**, ninguna métrica cambió. Tiene una explicación limpia: las 12 features del vector ya son matemáticamente invariantes a la amplitud (HNR/jitter/shimmer son razones o porcentajes, F0/formantes/brillo espectral son frecuencias, ninguna es una medida de nivel/volumen crudo). El código se dejó (no hace daño, es buena práctica), pero confirmó que esta no era la pieza que faltaba. Tiene tests en `shared/tests/test_io.py`.
+
+## 4.7. Por qué la aumentación sintética no transfería a voz real (encontrado y arreglado)
+
+Con la mezcla de sintéticos decorrelacionados de la sección 2C/4.4, el modelo llegaba a 100% en la prueba de estrés *sintética* pero seguía fallando igual de mal en las grabaciones reales de la sección 4.3. Se investigaron y arreglaron tres causas, en orden de qué tanto importaron:
+
+1. **Los formantes sintéticos eran 2 valores FIJOS exactos** (730/1090/2440 y 850/1650/2950), repetidos miles de veces, y ni siquiera caían en el rango real (el F1 real masculino promedia 456Hz, no 730). Un modelo de árboles puede aprender a reconocer esos números exactos como "esto es sintético, aquí sí uso formantes" en vez de aprender el patrón real de resonancia, que no ayuda en nada con una grabación real donde los formantes nunca son exactamente 730.000. **Este fue el cambio que finalmente movió la aguja** (ver 4.8). Se cambió a muestrear F1/F2/F3 de una distribución normal por género, calibrada con la media/desviación real de los propios datos de entrenamiento (`FORMANT_STATS` en `_dev_synthetic_decorrelated.py`).
+2. Las voces sintéticas tenían jitter/shimmer/HNR sospechosamente "limpios" comparado con voz real (shimmer sintético 4.0% vs real 11.0%, HNR sintético 15.8dB vs real 13.0dB): otra señal fácil de "esto es sintético". Se recalibraron los parámetros de ruido de `synth_vowel()` en `_dev_synthetic_dataset.py` (`jitter_std`, `shimmer_std`, `noise_std`, ahora aleatorios por clip) para que caigan dentro del rango real.
+3. Las voces sintéticas eran un tono sostenido parejo (sin entonación), mientras que voz real tiene el tono subiendo y bajando a lo largo de una oración: F0_std sintético 14Hz vs real 33Hz. Se agregó un contorno de entonación (`intonation_semitone_std`, un paseo aleatorio suavizado en semitonos) a `synth_vowel()`.
+
+Los cambios 2 y 3, solos, **no movieron nada** en las grabaciones reales de prueba (se probó cada uno por separado, con reentrenamientos completos entre cada uno). Solo cuando se combinaron con el cambio 1 (formantes variables) hubo una mejora real. Esto sugiere que el "atajo de detectar sintético" más fuerte de los tres era, por mucho, el de los formantes fijos, no los otros dos ruidos (aunque vale la pena mantenerlos, son gratis y hacen la síntesis más honesta de todas formas).
+
+## 4.8. Resultado con formantes variables: mejora real, pero parcial
+
+Con las tres correcciones de la sección 4.7 juntas, comparando el mismo conjunto de grabaciones reales de prueba contra el modelo (usando los 12 valores de features exactos que se reportaron en cada caso, no reanálisis de audio):
+
+| Caso | Antes de todo esto | Con formantes variables |
+|---|---|---|
+| Aguda actuada | 94.6 | **71.0** |
+| Aguda actuada nueva | 92.8 | **58.6** |
+| Grave actuada | 5.9 | 2.6 |
+| Voz normal | 0.3 | 0.6 |
+| Voz más grave | 2.3 | 2.2 |
+
+Las voces masculinas se quedaron igual de bien clasificadas. Las dos voces agudas actuadas bajaron mucho de "casi seguro femenino" a "ambiguo, apenas del lado femenino" (58.6 está prácticamente en la frontera de "andrógeno" según las bandas de `feedback.py`). **No se arregló del todo** (no se voltearon a masculino), pero es la primera mejora real medible en toda la investigación, no solo en datos sintéticos.
+
+El costo: accuracy general bajó de 98% a **85.15%**, y la prueba de estrés sintética bajó de 100% a **61.6%** (por debajo del umbral de advertencia de 70% en `05_evaluate_model.py`, que ahora sí avisa correctamente). Interpretación: con formantes fijos el modelo podía memorizar 2 valores exactos y sacar 100% "haciendo trampa"; con formantes variables ya no puede memorizar, tiene que generalizar de verdad, y le cuesta trabajo genuino (61.6%, por arriba de azar pero lejos de perfecto).
+
+**Confirmación en producción, no solo con números pegados:** se probó una grabación real nueva (voz actuada, descrita como "se oye muy fingida" al reescucharla con el reproductor del frontend) contra el modelo ya desplegado, y dio 97%. Confirma que la mejora es real pero parcial: sigue fallando en voz claramente forzada/actuada.
+
+**Para retomar mañana:**
+- Si se comparte el desglose completo de esa grabación nueva (con el reproductor + "ver las 12 features completas" del frontend), agregarla a la lista de casos de prueba conocidos.
+- Caminos no explorados todavía: más ejemplos sintéticos con formantes variables (ahora mismo son 3,000, mismos que con formantes fijos), variar la severidad de shimmer/jitter/entonación de forma correlacionada con el género (en voz real también difieren un poco por género, no solo por individuo), o pesar más los combos adversariales específicamente en vez de repartir parejo entre los 6 combos.
+- Sigue sin intentarse: pitch-normalizar antes de medir formantes (la idea original de esta sesión, pausada por la investigación de por qué la aumentación sintética no transfería) y el estimado de longitud de tracto vocal a partir de dispersión de formantes.
 
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 

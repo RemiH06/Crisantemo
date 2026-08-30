@@ -6,20 +6,29 @@ estrictamente por los formantes.
 
 Por qué existe: con el modelo entrenado solo sobre voz real (ver
 docs/TRAINING_REPRODUCTION.md sección 4.3), se encontró que el modelo
-aprendió a usar el tono como atajo, porque en voces reales tono y resonancia
-van correlacionados de forma natural (quien tiene voz más aguda de forma
-natural también suele tener un tracto vocal más corto). Estos ejemplos
-rompen esa correlación a propósito: tono agudo con formantes masculinos, y
-tono grave con formantes femeninos, además de los dos casos "naturales".
-Mezclados con los datos reales (ver sección 2C), fuerzan al modelo a fijarse
-en los formantes para clasificar bien, no solo en el tono.
+aprendió a usar el tono como atajo. `training/notebooks/feature_analysis.ipynb`
+encontró la razón exacta: F0 solo tiene AUC 0.97 clasificando género en
+Common Voice (casi perfecto), los formantes solos apenas 0.57-0.73 (la
+correlación entre ambos es en realidad débil, r=0.10-0.37). No es que el
+modelo "prefiera" el atajo, es la señal objetivamente más fuerte que tiene.
+Además, tonos agudos actuados reales (320-356 Hz) caen fuera de todo el
+rango de F0 que el dataset real cubre (que no pasa de ~300 Hz), así que ahí
+el modelo extrapola sin ningún ejemplo de referencia.
+
+Estos ejemplos rompen la asociación tono-formantes a propósito, y el rango
+"very_high" cubre justo la zona de tono agudo actuado real donde se
+encontró el problema (antes solo llegábamos a 260 Hz). Mezclados con los
+datos reales (ver sección 2C) y en cantidad suficiente para no diluirse
+(la primera vez, 800 contra 5,000 reales no alcanzó, ver sección 4.4),
+fuerzan al modelo a fijarse en los formantes para clasificar bien en esa
+zona, no solo en el tono.
 
 El prefijo "_dev_" marca que este script no es parte del pipeline principal
 de producción (igual que _dev_synthetic_dataset.py), es un generador de
 datos de apoyo para el entrenamiento, no un fixture de prueba de mecánica.
 
 Uso:
-    python scripts/_dev_synthetic_decorrelated.py --n-per-combo 200
+    python scripts/_dev_synthetic_decorrelated.py --n-per-combo 500
 """
 
 from __future__ import annotations
@@ -33,23 +42,48 @@ import soundfile as sf
 from _dev_synthetic_dataset import SAMPLE_RATE, synth_vowel
 from common import RAW_DIR
 
-# Mismos perfiles de formantes que _dev_synthetic_dataset.py; la diferencia
-# es que aquí el rango de F0 se elige de forma independiente del perfil de
-# formantes, en vez de estar fijo por clase.
+# El rango de F0 se elige de forma independiente del perfil de formantes, en
+# vez de estar fijo por clase. "very_high" se agregó después de encontrar
+# que voz aguda actuada real llega hasta ~356 Hz, fuera del rango que
+# cualquier otra parte del pipeline había cubierto hasta ahora.
 F0_RANGES = {
     "low": (85, 140),
     "high": (170, 260),
+    "very_high": (280, 400),
 }
-FORMANT_PROFILES = {
-    "masculine": (730, 1090, 2440),
-    "feminine": (850, 1650, 2950),
+
+# Media y desviación estándar de F1/F2/F3 por género, calculadas sobre los
+# datos reales de entrenamiento (ver training/notebooks/feature_analysis.ipynb).
+# Antes se usaban dos formantes FIJOS exactos (730/1090/2440 y 850/1650/2950,
+# ni siquiera dentro del rango real: el F1 real masculino promedia 456Hz, no
+# 730). Con solo 2 valores exactos repetidos miles de veces, un modelo de
+# árboles puede aprender a reconocer esos números precisos como "esto es
+# sintético" en vez de aprender el patrón de resonancia real (ver
+# docs/TRAINING_REPRODUCTION.md sección 4.7). Muestrear de una distribución
+# continua calibrada a los datos reales cierra ese atajo y además hace que
+# los ejemplos sintéticos caigan dentro del rango de formantes real.
+FORMANT_STATS = {
+    "masculine": {"f1": (455.7, 58.7), "f2": (1582.4, 142.5), "f3": (2628.9, 156.1)},
+    "feminine": {"f1": (488.4, 51.6), "f2": (1681.2, 183.6), "f3": (2764.9, 171.8)},
 }
 BANDWIDTH = 90
 
 
+def _sample_formants(profile_name: str, rng: np.random.Generator) -> tuple[float, float, float]:
+    stats = FORMANT_STATS[profile_name]
+    f1 = float(rng.normal(*stats["f1"]))
+    f2 = float(rng.normal(*stats["f2"]))
+    f3 = float(rng.normal(*stats["f3"]))
+    # Mantener el orden físico F1 < F2 < F3 con margen mínimo, por si una
+    # muestra rara de la normal saliera fuera de orden.
+    f2 = max(f2, f1 + 200)
+    f3 = max(f3, f2 + 200)
+    return f1, f2, f3
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n-per-combo", type=int, default=200)
+    parser.add_argument("--n-per-combo", type=int, default=500)
     args = parser.parse_args()
 
     rng = np.random.default_rng(43)  # semilla distinta a la de _dev_synthetic_dataset.py
@@ -62,11 +96,12 @@ def main() -> None:
         writer = csv.writer(f)
         writer.writerow(["audio_path", "gender", "age", "client_id"])
         for f0_name, f0_range in F0_RANGES.items():
-            for formant_name, formants in FORMANT_PROFILES.items():
+            for formant_name in FORMANT_STATS:
                 gender = "female_feminine" if formant_name == "feminine" else "male_masculine"
                 combo_tag = f"decorrelated_{f0_name}f0_{formant_name}formants"
                 for i in range(args.n_per_combo):
                     f0 = rng.uniform(*f0_range)
+                    formants = _sample_formants(formant_name, rng)
                     signal = synth_vowel(f0, formants, BANDWIDTH, rng)
                     file_path = out_dir / f"{combo_tag}_{i:04d}.wav"
                     sf.write(file_path, signal, SAMPLE_RATE)

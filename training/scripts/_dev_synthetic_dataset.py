@@ -49,22 +49,70 @@ def formant_resonator(signal: np.ndarray, freq: float, bandwidth: float, sr: int
 
 
 def synth_vowel(
-    f0: float, formants: tuple[float, float, float], bandwidth: float, rng: np.random.Generator
+    f0: float,
+    formants: tuple[float, float, float],
+    bandwidth: float,
+    rng: np.random.Generator,
+    jitter_std: float | None = None,
+    shimmer_std: float | None = None,
+    noise_std: float | None = None,
+    intonation_semitone_std: float | None = None,
 ) -> np.ndarray:
+    """Sintetiza una vocal con pulsos glotales filtrados por resonadores de formantes.
+
+    jitter_std/shimmer_std/noise_std controlan qué tan "áspera" suena la voz
+    (variación periodo a periodo, variación de amplitud pulso a pulso, y
+    ruido de fondo). intonation_semitone_std controla cuánto sube y baja el
+    tono a lo largo de la grabación (entonación natural de una oración), en
+    vez de un tono sostenido parejo. Si se dejan en None, cada llamada saca
+    su propia severidad al azar dentro de un rango calibrado para que
+    jitter_local_pct/shimmer_local_pct/hnr_db/f0_std_hz/f0_range_semitones
+    terminen en rangos parecidos a voz real, no sospechosamente más limpios
+    (ver docs/TRAINING_REPRODUCTION.md sección 4.6: un modelo entrenado con
+    voces sintéticas demasiado limpias/parejas puede aprender a distinguir
+    "sintético vs. real" por esas features en vez de aprender la lección de
+    tono/resonancia que se buscaba enseñarle; un tono sostenido sin
+    entonación resultó ser la señal más delatora de todas).
+    """
     n_samples = int(SAMPLE_RATE * DURATION_SECONDS)
-    period = SAMPLE_RATE / f0
+    if jitter_std is None:
+        jitter_std = rng.uniform(0.010, 0.035)
+    if shimmer_std is None:
+        shimmer_std = rng.uniform(0.03, 0.11)
+    if noise_std is None:
+        noise_std = rng.uniform(0.0025, 0.013)
+    if intonation_semitone_std is None:
+        intonation_semitone_std = rng.uniform(2.0, 5.0)
+
+    # Contorno de entonación: unos pocos puntos de control al azar,
+    # interpolados suavemente a lo largo de la grabación, para que el tono
+    # suba y baje como en una oración real en vez de quedarse fijo.
+    n_control_points = 8
+    control_semitones = rng.normal(0, intonation_semitone_std, n_control_points)
+    control_semitones -= control_semitones.mean()
+    contour_semitones = np.interp(
+        np.arange(n_samples),
+        np.linspace(0, n_samples - 1, n_control_points),
+        control_semitones,
+    )
+
     pulse_times = []
+    pulse_gains = []
     t = 0.0
     while t < n_samples:
+        instantaneous_f0 = f0 * (2.0 ** (contour_semitones[min(int(t), n_samples - 1)] / 12.0))
+        period = SAMPLE_RATE / instantaneous_f0
         pulse_times.append(int(t))
-        t += period * (1 + rng.normal(0, 0.01))  # jitter leve en el periodo
+        pulse_gains.append(max(0.05, 1.0 + rng.normal(0, shimmer_std)))
+        t += period * (1 + rng.normal(0, jitter_std))
     excitation = np.zeros(n_samples)
-    valid_pulses = [p for p in pulse_times if p < n_samples]
-    excitation[valid_pulses] = 1.0
+    for pulse_t, gain in zip(pulse_times, pulse_gains):
+        if pulse_t < n_samples:
+            excitation[pulse_t] = gain
 
     signal = sum(formant_resonator(excitation, f, bandwidth, SAMPLE_RATE) for f in formants)
     signal = signal / (np.max(np.abs(signal)) + 1e-9)
-    signal = signal + rng.normal(0, 0.01, size=n_samples)  # ruido leve, simula micrófono
+    signal = signal + rng.normal(0, noise_std, size=n_samples)
     return signal.astype(np.float32)
 
 
