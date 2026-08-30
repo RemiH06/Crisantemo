@@ -2,7 +2,7 @@
 
 Esto documenta exactamente los pasos que se corrieron para llegar a `training/data/reports/eval_v1.md`. Sirve tanto para repetirlo con el dataset sintético de prueba como, en una máquina con internet completo, para correrlo con Mozilla Common Voice de verdad.
 
-**Estado actual: `eval_v1.md` viene de 5,000 clips reales + 3,000 sintéticos decorrelacionados con formantes variables** (secciones 2A, 2C, 4.6, 4.7). 85.15% accuracy, F1 0.8534, peso de F0 de 25.1%, 61.6% en la prueba de estrés adversarial sintética. **Importante:** la accuracy bajó a propósito respecto a versiones anteriores (que llegaban a 98% pero "hacían trampa", ver sección 4.7); el modelo actual mejora de verdad en voz actuada real (ver sección 4.8) pero **no lo resuelve del todo**, sigue sin resolverse por completo. No lo omitas si vas a confiar en este modelo para algo serio. Sesión en pausa aquí, continúa desde la sección 4.8.
+**Estado actual (fin de la investigación de sesgo de tono, por ahora): `models/crisantemo_v1.joblib` es 5,000 clips reales + 3,000 sintéticos decorrelacionados con formantes variables, entrenado con `--adversarial-weight 5` y calibrado con `FrozenEstimator` sobre el split de val** (secciones 2A, 2C, 4.6-4.9). De 5 grabaciones reales de prueba, una ya cruza correctamente a masculino tras forzar tono agudo sin trabajar resonancia; las otras mejoraron pero no todas cruzaron del todo. Mejora real, no una solución completa. Historia completa con números en las secciones 4.3 a 4.9, que es justo donde continuar.
 
 ## 1. Preparar el entorno
 
@@ -188,6 +188,27 @@ El costo: accuracy general bajó de 98% a **85.15%**, y la prueba de estrés sin
 - Si se comparte el desglose completo de esa grabación nueva (con el reproductor + "ver las 12 features completas" del frontend), agregarla a la lista de casos de prueba conocidos.
 - Caminos no explorados todavía: más ejemplos sintéticos con formantes variables (ahora mismo son 3,000, mismos que con formantes fijos), variar la severidad de shimmer/jitter/entonación de forma correlacionada con el género (en voz real también difieren un poco por género, no solo por individuo), o pesar más los combos adversariales específicamente en vez de repartir parejo entre los 6 combos.
 - Sigue sin intentarse: pitch-normalizar antes de medir formantes (la idea original de esta sesión, pausada por la investigación de por qué la aumentación sintética no transfería) y el estimado de longitud de tracto vocal a partir de dispersión de formantes.
+
+## 4.9. Pesar los casos adversariales: mejora real (con dos bugs encontrados en el camino)
+
+Siguiente experimento, barato porque no necesita re-extraer features: en `04_train_model.py`, entrenar el modelo final dándole más peso (`sample_weight`, `--adversarial-weight`, default 5x) a los 500 ejemplos de cada combinación adversarial (tono agudo + formantes masculinos, tono grave + formantes femeninos) contra el resto. La comparación de CV entre logreg/LightGBM se queda sin peso (es solo para elegir el algoritmo).
+
+Al probar contra las 5 grabaciones reales, los números salieron **idénticos** a la corrida anterior sin peso. Investigando por qué, se encontraron dos bugs reales en `06_export_model.py`:
+
+1. **El peso nunca llegaba al modelo exportado.** `CalibratedClassifierCV(raw_model, cv=5).fit(X_train, y_train)` clona y REENTRENA `raw_model` desde cero en cada uno de los 5 folds, sin pasarle `sample_weight`. El modelo entrenado con peso (`crisantemo_v1_raw.joblib`) sí lo tenía, pero se descartaba silenciosamente al calibrar. Se corrigió pasando `sample_weight` también aquí.
+2. **Aun corregido, calibrar con `cv=5` seguía dando peor resultado que el modelo crudo sin calibrar.** Reentrenar 5 copias, cada una con 4/5 de los datos, diluye el efecto del peso. La solución (que además ya estaba anotada como pendiente en el código desde antes de esta sesión: "una vez que haya volumen de datos real, vale la pena calibrar sobre el split de val con cv='prefit'") es calibrar sin reentrenar: usar `raw_model` tal cual (ya con su peso adentro) y solo ajustar la curva de calibración sobre el split de validación, datos que el modelo no vio en entrenamiento. `cv="prefit"` está removido en scikit-learn >= 1.6 (este proyecto usa 1.9); el reemplazo es envolver el modelo con `sklearn.frozen.FrozenEstimator`.
+
+Con ambos bugs corregidos, comparado contra las 5 grabaciones reales:
+
+| Caso | Al empezar la sesión | Con formantes variables (4.8) | Con peso adversarial + calibración corregida |
+|---|---|---|---|
+| Aguda actuada | 94.6 | 71.0 | 74.4 |
+| Aguda actuada nueva | 92.8 | 58.6 | **33.7 (cruzó a masculino)** |
+| Grave actuada | 5.9 | 2.6 | 11.5 |
+| Voz normal | 0.3 | 0.6 | 2.9 |
+| Voz más grave | 2.3 | 2.2 | 4.0 |
+
+**"Aguda actuada nueva" cruzó al lado masculino por primera vez en toda la investigación.** Las tres voces masculinas se mantienen correctamente clasificadas, con algo más de margen que antes pero sin cruzar. "Aguda actuada" (la primera, F0 más bajo que la nueva pero aun así el caso más extremo del set) sigue sin cruzar. Mejora real y medible, todavía no una solución completa.
 
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
