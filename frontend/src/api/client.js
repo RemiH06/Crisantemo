@@ -32,8 +32,13 @@ export async function analyzeAudio(blob, filename = "grabacion.webm") {
 
   if (!response.ok) {
     if (response.status === 422) {
+      // El backend ya redacta este mensaje en tono de apoyo (ver
+      // shared/acoustic_features/features.py), así que se muestra tal cual
+      // en vez de una versión genérica fija aquí que no distinguiría entre
+      // "grabación muy corta" y "la grabación mezcla dos tonos distintos".
+      const body = await response.json().catch(() => ({}));
       throw new AnalyzeError(
-        "No detectamos suficiente voz en esa grabación. Intenta de nuevo hablando un poco más, en un lugar silencioso.",
+        body.detail || "No pudimos analizar esa grabación. Intenta de nuevo.",
         response.status,
       );
     }

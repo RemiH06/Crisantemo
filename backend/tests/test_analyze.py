@@ -32,3 +32,12 @@ def test_analyze_rejects_silence(client, silence_wav_bytes):
         files={"file": ("silence.wav", silence_wav_bytes, "audio/wav")},
     )
     assert response.status_code == 422
+
+
+def test_analyze_rejects_register_switch(client, register_switch_wav_bytes):
+    response = client.post(
+        "/api/v1/analyze",
+        files={"file": ("switch.wav", register_switch_wav_bytes, "audio/wav")},
+    )
+    assert response.status_code == 422
+    assert "tono" in response.json()["detail"].lower()

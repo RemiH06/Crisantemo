@@ -28,6 +28,21 @@ F0_CEILING_HZ = 500.0
 # vibración glotal para estabilizarse.
 MIN_VOICED_SECONDS = 0.3
 
+# Si en la grabación hay un cambio de tono/registro (ej. empezar grave y
+# terminar agudo), el promedio de toda la grabación no representa a ninguna
+# de las dos voces, cae en un punto ambiguo del espacio de features. Se
+# detecta buscando dos segmentos de TIEMPO estables (poca variación interna)
+# cuyo tono medio difiera mucho entre sí. No basta con buscar un hueco en la
+# distribución de valores: una voz real probablemente desliza el tono de un
+# registro a otro en vez de saltar de golpe, lo que rellena cualquier hueco
+# (se probó y falló, ver docs/API.md). Comparar segmentos
+# de tiempo detecta el deslizamiento igual, porque no importa cómo se llegó
+# de un registro al otro, solo que hubo dos partes estables y distintas.
+REGISTER_SWITCH_SEMITONE_GAP = 5.0
+REGISTER_SEGMENT_MAX_STD_SEMITONES = 2.5
+REGISTER_SWITCH_CANDIDATE_SPLITS = (0.3, 0.4, 0.5, 0.6, 0.7)
+MIN_FRAMES_FOR_STABILITY_CHECK = 20
+
 # Orden y nombres exactos del vector de features. Este orden es el que se
 # serializa en models/feature_schema_v1.json y el que el modelo espera en
 # predict(). No reordenar sin regenerar el schema y reentrenar.
@@ -49,6 +64,10 @@ FEATURE_NAMES: list[str] = [
 
 class InsufficientVoiceError(ValueError):
     """El audio no contiene suficiente señal de voz sonora para analizarlo."""
+
+
+class UnstableVoiceError(ValueError):
+    """La grabación parece mezclar más de un registro de voz (ej. empezar grave y cambiar a agudo)."""
 
 
 @dataclass
@@ -84,6 +103,38 @@ def _safe_mean(values: list[float]) -> float:
     return float(np.mean(values)) if values else 0.0
 
 
+def _has_register_switch(voiced_f0_hz: np.ndarray) -> bool:
+    """True si la grabación parece mezclar dos registros de tono muy distintos.
+
+    Prueba varios puntos de corte en el tiempo (30%-70% de la grabación); si
+    en alguno el segmento de antes y el de después son cada uno internamente
+    estables (poca variación) pero su tono medio difiere mucho entre sí, es
+    un cambio de registro, no entonación natural (que varía de forma
+    continua y no forma dos segmentos estables tan distintos).
+    """
+    if len(voiced_f0_hz) < MIN_FRAMES_FOR_STABILITY_CHECK:
+        return False
+
+    semitones = np.log2(voiced_f0_hz) * 12.0
+    n = len(semitones)
+    min_segment_frames = MIN_FRAMES_FOR_STABILITY_CHECK // 2
+
+    for fraction in REGISTER_SWITCH_CANDIDATE_SPLITS:
+        split = int(n * fraction)
+        if split < min_segment_frames or (n - split) < min_segment_frames:
+            continue
+        before, after = semitones[:split], semitones[split:]
+        if (
+            np.std(before) > REGISTER_SEGMENT_MAX_STD_SEMITONES
+            or np.std(after) > REGISTER_SEGMENT_MAX_STD_SEMITONES
+        ):
+            continue
+        if abs(np.median(before) - np.median(after)) >= REGISTER_SWITCH_SEMITONE_GAP:
+            return True
+
+    return False
+
+
 def extract_features(samples: np.ndarray, sample_rate: int) -> AcousticFeatures:
     """Extrae el vector de features acústicas de una señal de audio mono.
 
@@ -107,8 +158,15 @@ def extract_features(samples: np.ndarray, sample_rate: int) -> AcousticFeatures:
 
     if voiced_seconds < MIN_VOICED_SECONDS:
         raise InsufficientVoiceError(
-            f"Solo se detectaron {voiced_seconds:.2f}s de voz sonora; "
-            f"se requieren al menos {MIN_VOICED_SECONDS}s para un análisis confiable"
+            f"No detectamos suficiente voz en esta grabación (solo {voiced_seconds:.2f}s). "
+            "Intenta de nuevo hablando un poco más, en un lugar silencioso."
+        )
+
+    if _has_register_switch(voiced_f0):
+        raise UnstableVoiceError(
+            "Esta grabación parece mezclar más de un tono de voz muy distinto (por ejemplo, "
+            "empezar grave y cambiar a agudo a la mitad). Intenta de nuevo manteniendo un mismo "
+            "tono y resonancia de principio a fin, así el resultado es más confiable."
         )
 
     f0_mean = float(np.mean(voiced_f0))

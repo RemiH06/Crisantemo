@@ -52,3 +52,12 @@ def sine_wav_bytes() -> bytes:
 @pytest.fixture
 def silence_wav_bytes() -> bytes:
     return _wav_bytes(np.zeros(SAMPLE_RATE))
+
+
+@pytest.fixture
+def register_switch_wav_bytes() -> bytes:
+    """Grave y luego agudo a la mitad, simula grabar cambiando de voz a medias."""
+    t = np.linspace(0, 1.0, SAMPLE_RATE, endpoint=False)
+    low = 0.5 * np.sin(2 * np.pi * 110.0 * t)
+    high = 0.5 * np.sin(2 * np.pi * 300.0 * t)
+    return _wav_bytes(np.concatenate([low, high]))

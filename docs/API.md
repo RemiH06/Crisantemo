@@ -1,6 +1,6 @@
-# API (diseño planeado)
+# API
 
-Este documento describe el diseño de la API acordado en la planeación original del proyecto (`docs/PLAN.md`). Es el contrato al que debe apegarse la implementación de Fase 2, todavía sin construir. Nada de lo descrito aquí está implementado hoy; cuando `backend/app/api/` exista de verdad, este documento debe actualizarse para reflejar la implementación real, no quedarse como aspiración.
+`POST /api/v1/analyze`, `GET /health` y `GET /api/v1/model-info` ya están implementados en `backend/app/api/` y corresponden a lo descrito aquí. `WS /api/v1/stream` (modo en vivo) sigue siendo diseño planeado, Fase 4 no ha empezado.
 
 ## Principios de diseño
 
@@ -50,7 +50,14 @@ Sube un audio completo (multipart) y recibe el análisis.
 
 Los nombres de `features` deben coincidir exactamente con `models/feature_schema_v1.json` y con `shared/acoustic_features.FEATURE_NAMES`; el backend valida este contrato al arrancar.
 
-**Errores esperados**: audio demasiado corto, sin voz detectada (VAD no encuentra segmentos hablados), o archivo corrupto/formato no soportado. El manejo explícito de estos casos es trabajo de Fase 5 (endurecimiento), pero el contrato de la respuesta de error debe quedar definido en Fase 2.
+**Errores esperados** (todos como `{"detail": "mensaje en tono de apoyo"}`, ya implementados):
+
+| Status | Causa |
+|---|---|
+| `400` | Archivo vacío o no se pudo decodificar como audio (formato no soportado, corrupto). |
+| `422` | Menos de `MIN_VOICED_SECONDS` (0.3s) de voz sonora detectada. |
+| `422` | La grabación mezcla dos registros de tono muy distintos (ej. empezar grave y cambiar a agudo a la mitad); el promedio no representaría a ninguna de las dos voces. Ver `shared/acoustic_features/features.py::_has_register_switch`. |
+| `500` | Error inesperado del servidor. |
 
 ### `WS /api/v1/stream`
 

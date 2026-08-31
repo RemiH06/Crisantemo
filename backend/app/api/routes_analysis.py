@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from acoustic_features import InsufficientVoiceError, extract_features
+from acoustic_features import InsufficientVoiceError, UnstableVoiceError, extract_features
 
 from app.audio.decode import InvalidAudioError, decode_upload
 from app.schemas import AnalyzeResponse, FeaturesOut, FeedbackOut, MetaOut
@@ -24,6 +24,8 @@ async def analyze(request: Request, file: UploadFile = File(...)) -> AnalyzeResp
     try:
         features = extract_features(samples, sample_rate)
     except InsufficientVoiceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except UnstableVoiceError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     bundle = request.app.state.model_bundle

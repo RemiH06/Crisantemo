@@ -5,6 +5,7 @@ from .features import (
     MIN_VOICED_SECONDS,
     AcousticFeatures,
     InsufficientVoiceError,
+    UnstableVoiceError,
     extract_features,
 )
 from .io import TARGET_SAMPLE_RATE, TARGET_RMS, load_audio_mono, normalize_amplitude
@@ -17,6 +18,7 @@ __all__ = [
     "MIN_VOICED_SECONDS",
     "AcousticFeatures",
     "InsufficientVoiceError",
+    "UnstableVoiceError",
     "extract_features",
     "TARGET_SAMPLE_RATE",
     "TARGET_RMS",
