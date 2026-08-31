@@ -175,6 +175,11 @@ function idleView() {
         no mide qué tan válida es tu voz ni tu identidad: cada quien encuentra y desarrolla su voz
         en su propio tiempo. No guardamos tu grabación, el análisis ocurre y se olvida.
       </p>
+      <p>
+        El modelo todavía se está afinando: funciona mejor con tu voz de todos los días que con
+        cambios muy bruscos de tono de un momento a otro. Si haces un cambio dramático, el
+        resultado puede ser menos confiable. Vamos mejorando esto con el tiempo.
+      </p>
     </div>
 
     <div class="onboard-row">

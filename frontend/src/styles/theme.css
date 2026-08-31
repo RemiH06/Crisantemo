@@ -200,6 +200,7 @@ pre code { background: none; border: none; padding: 0; color: inherit; }
   color: var(--accent); margin-bottom: 5px;
 }
 .callout p { margin-bottom: 0; font-size: 13px; }
+.callout p + p { margin-top: 8px; }
 .callout.ok      { border-color: var(--ok);      } .callout.ok      .callout-title { color: var(--ok);      }
 .callout.warn    { border-color: var(--warn);    } .callout.warn    .callout-title { color: var(--warn);    }
 .callout.danger  { border-color: var(--danger);  } .callout.danger  .callout-title { color: var(--danger);  }
