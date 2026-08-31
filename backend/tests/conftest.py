@@ -61,3 +61,22 @@ def register_switch_wav_bytes() -> bytes:
     low = 0.5 * np.sin(2 * np.pi * 110.0 * t)
     high = 0.5 * np.sin(2 * np.pi * 300.0 * t)
     return _wav_bytes(np.concatenate([low, high]))
+
+
+@pytest.fixture
+def temp_file_spy(monkeypatch):
+    """Registra cada archivo temporal que crea app.audio.decode.decode_upload,
+    para poder verificar después que ninguno sobrevivió a la respuesta (ver
+    docs/ETHICS_PRIVACY.md: el audio no se persiste)."""
+    import tempfile
+
+    created_paths: list[str] = []
+    original_mkstemp = tempfile.mkstemp
+
+    def spy_mkstemp(*args, **kwargs):
+        fd, path = original_mkstemp(*args, **kwargs)
+        created_paths.append(path)
+        return fd, path
+
+    monkeypatch.setattr("app.audio.decode.tempfile.mkstemp", spy_mkstemp)
+    return created_paths
