@@ -50,14 +50,18 @@ Sube un audio completo (multipart) y recibe el análisis.
 
 Los nombres de `features` deben coincidir exactamente con `models/feature_schema_v1.json` y con `shared/acoustic_features.FEATURE_NAMES`; el backend valida este contrato al arrancar.
 
+**Límites del archivo subido** (`backend/app/audio/decode.py`): 20MB de tamaño, 2 minutos de duración decodificada. Generosos a propósito, ninguna grabación de práctica real se les acerca; son solo para no procesar una subida absurda por accidente o abuso.
+
 **Errores esperados** (todos como `{"detail": "mensaje en tono de apoyo"}`, ya implementados):
 
 | Status | Causa |
 |---|---|
-| `400` | Archivo vacío o no se pudo decodificar como audio (formato no soportado, corrupto). |
+| `400` | Archivo vacío, más grande de 20MB, decodifica a más de 2 minutos, o no se pudo decodificar como audio (formato no soportado, corrupto). |
 | `422` | Menos de `MIN_VOICED_SECONDS` (0.3s) de voz sonora detectada. |
 | `422` | La grabación mezcla dos registros de tono muy distintos (ej. empezar grave y cambiar a agudo a la mitad); el promedio no representaría a ninguna de las dos voces. Ver `shared/acoustic_features/features.py::_has_register_switch`. |
 | `500` | Error inesperado del servidor. |
+
+El formato de error es el mismo para los tres casos: un solo campo `detail` con el mensaje completo ya redactado en tono de apoyo (no un código separado ni un campo por error), porque el frontend lo muestra tal cual sin reinterpretarlo (ver `frontend/src/api/client.js`).
 
 ### `WS /api/v1/stream`
 
@@ -84,10 +88,4 @@ Healthcheck simple para Docker/orquestación. `200 OK` si el servicio está arri
 
 ### `GET /api/v1/model-info`
 
-Metadata del modelo cargado: versión, fecha de entrenamiento, métricas de evaluación relevantes (por ejemplo el peso combinado de features de F0 de `eval_v1.md`), para que el frontend o cualquier cliente pueda mostrar de qué modelo viene un score.
-
-## Pendiente de decidir en Fase 2
-
-- Formato exacto de los mensajes de error (código, mensaje, campo afectado).
-- Límites de tamaño/duración de audio aceptados en `/analyze`.
-- Si `/model-info` requiere autenticación o es público.
+Metadata del modelo cargado: versión, fecha de entrenamiento, métricas de evaluación relevantes (por ejemplo el peso combinado de features de F0 de `eval_v1.md`), para que el frontend o cualquier cliente pueda mostrar de qué modelo viene un score. Público, sin autenticación: no expone nada sensible (nombres de features y versión del modelo, no datos de ninguna persona), y el proyecto no tiene infraestructura de autenticación todavía. Si eso cambia (por ejemplo, al agregar historial de progreso por sesión), revisar esta decisión.

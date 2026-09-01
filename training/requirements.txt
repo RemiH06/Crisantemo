@@ -13,7 +13,8 @@ scipy>=1.13
 tqdm>=4.66
 
 # Notebook de análisis exploratorio (training/notebooks/), puerto 9002 en
-# docker-compose.yml es justo para esto.
+# docker-compose.yml es justo para esto. Plotly es la librería de
+# graficación de cabecera del proyecto, no matplotlib/seaborn.
 jupyterlab>=4.2
-matplotlib>=3.9
-seaborn>=0.13
+plotly>=5.24
+kaleido>=0.2.1

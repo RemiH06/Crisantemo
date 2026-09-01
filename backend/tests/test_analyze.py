@@ -41,3 +41,23 @@ def test_analyze_rejects_register_switch(client, register_switch_wav_bytes):
     )
     assert response.status_code == 422
     assert "tono" in response.json()["detail"].lower()
+
+
+def test_analyze_rejects_oversized_file(client, monkeypatch):
+    monkeypatch.setattr("app.audio.decode.MAX_UPLOAD_BYTES", 100)
+    response = client.post(
+        "/api/v1/analyze",
+        files={"file": ("big.wav", b"x" * 200, "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "grande" in response.json()["detail"].lower()
+
+
+def test_analyze_rejects_overlong_duration(client, sine_wav_bytes, monkeypatch):
+    monkeypatch.setattr("app.audio.decode.MAX_DURATION_SECONDS", 1.0)
+    response = client.post(
+        "/api/v1/analyze",
+        files={"file": ("tone.wav", sine_wav_bytes, "audio/wav")},
+    )
+    assert response.status_code == 400
+    assert "dura" in response.json()["detail"].lower()
