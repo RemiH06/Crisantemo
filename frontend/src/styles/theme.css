@@ -396,6 +396,15 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
   margin-bottom: 12px;
 }
 
+/* Gráfica de línea del modo en vivo, ver components/liveGraph.js. */
+.live-graph {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
 /* ══════════════════════════════════════════════════════
    MEDIDOR DE SCORE — el degradado usa los colores de la
    bandera trans (celeste/blanco/rosa) como la escala misma

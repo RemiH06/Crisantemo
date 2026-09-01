@@ -65,22 +65,27 @@ El formato de error es el mismo para los tres casos: un solo campo `detail` con 
 
 ### `WS /api/v1/stream`
 
-Modo en vivo. El cliente envía chunks de audio PCM cada ~300ms. El servidor:
+Modo en vivo. Implementado (`backend/app/api/routes_stream.py` + `backend/app/streaming/session.py`); ver `docs/ARCHITECTURE.md` por qué se descartó Rust/WASM y se quedó todo del lado del backend (mismo `shared/acoustic_features`, cero riesgo de que diverja del análisis por REST).
 
-1. Acumula una ventana de 2-3 segundos con solape (los formantes necesitan señal suficiente para estabilizarse).
-2. Filtra silencio con VAD (`webrtcvad`) para no puntuar silencio.
-3. Emite un mensaje `score_update` con `score` (crudo) y `score_smoothed` (EMA) cada 1-2 segundos, para que el medidor no salte de golpe.
+**Handshake**: el primer mensaje del cliente debe ser texto JSON `{"sample_rate": N}` (la frecuencia real de captura del navegador, normalmente 44100 o 48000, no hace falta que sea 16000). Si no llega así, el servidor cierra la conexión con código `1002`.
+
+**Después del handshake**: el cliente manda solo frames binarios, PCM Int16 mono little-endian, de forma continua (no hace falta que el cliente los trocee a un tamaño exacto). El servidor:
+
+1. Acumula todo en un buffer propio (el cliente no lleva ventaneo, toda esa lógica vive en `StreamingSession`) y se queda solo con los últimos `WINDOW_SECONDS` (2.5s).
+2. Cada vez que se acumularon `STEP_SECONDS` (1.2s) de audio nuevo, resamplea a 16kHz si hace falta, normaliza amplitud (misma función que usa `/analyze`) y corre `extract_features` sobre esa ventana.
+3. Si la ventana no tiene suficiente voz sonora o parece mezclar dos tonos de voz (`InsufficientVoiceError`/`UnstableVoiceError`, los mismos chequeos de `/analyze`), simplemente no manda nada esa vuelta y espera a la siguiente ventana. No hay VAD aparte (`webrtcvad`): se reusa el mismo chequeo de voz sonora que ya existe, evita una dependencia que además no compila en algunas máquinas (ver `CLAUDE.md`).
+4. Si hay suficiente voz, emite `score_update` con `score` (crudo de esa ventana) y `score_smoothed` (EMA, `EMA_ALPHA=0.35`, para que el medidor no salte de golpe).
 
 ```json
 {
   "type": "score_update",
   "score": 0,
   "score_smoothed": 0,
-  "features": { "...": "mismo desglose que /analyze" }
+  "features": { "...": "mismo desglose que /analyze, sin voiced_seconds/duration_seconds" }
 }
 ```
 
-Este endpoint depende de la decisión de arquitectura de Fase 4 documentada en `docs/ARCHITECTURE.md` (posible extracción de features en el navegador vía Rust/WASM en vez de solo en el backend); el contrato exacto de mensajes puede cambiar cuando esa fase arranque.
+El cliente (`frontend/src/audio/liveStream.js`) captura con `ScriptProcessorNode` (no `AudioWorkletNode`: deprecado pero funciona en todos los navegadores actuales sin necesitar cargar un archivo de worklet aparte) y grafica con canvas vanilla (`frontend/src/components/liveGraph.js`), no React.
 
 ### `GET /health`
 
