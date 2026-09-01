@@ -6,6 +6,11 @@
  * Los colores de las luces siguen la paleta de tokens (--tomato, --indigo,
  * etc.); si se cambia la paleta en theme.css, basta con actualizar los
  * arreglos LIGHTS_LIGHT/LIGHTS_DARK de abajo para que coincidan.
+ *
+ * "sky" y "rose" (las dos más cercanas a azul/rosa) usan los tonos exactos
+ * de la bandera trans (#5BCEFA / #F5A9B8, los mismos que ya usan el logo y
+ * el medidor de score), en vez de un azul/rosa genérico. El resto de la
+ * paleta disco se dejó igual a propósito, no es un retema completo.
  */
 
 const LIGHTS_LIGHT = [
@@ -15,8 +20,8 @@ const LIGHTS_LIGHT = [
   { r: 192, g: 122, b: 16 }, // mustard
   { r: 138, g: 74, b: 200 }, // lila
   { r: 212, g: 112, b: 58 }, // peach
-  { r: 42, g: 122, b: 200 }, // sky
-  { r: 200, g: 74, b: 112 }, // rose
+  { r: 91, g: 206, b: 250 }, // sky -> #5BCEFA (bandera trans)
+  { r: 245, g: 169, b: 184 }, // rose -> #F5A9B8 (bandera trans)
 ];
 
 const LIGHTS_DARK = [
@@ -26,8 +31,8 @@ const LIGHTS_DARK = [
   { r: 240, g: 168, b: 48 },
   { r: 184, g: 122, b: 240 },
   { r: 240, g: 144, b: 96 },
-  { r: 80, g: 168, b: 240 },
-  { r: 240, g: 96, b: 144 },
+  { r: 91, g: 206, b: 250 }, // sky -> #5BCEFA (bandera trans, ya suficientemente clara para fondo oscuro)
+  { r: 245, g: 169, b: 184 }, // rose -> #F5A9B8 (bandera trans)
 ];
 
 function makeLights(cols) {

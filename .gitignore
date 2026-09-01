@@ -9,3 +9,4 @@ models/*.onnx
 *.egg-info/
 CLAUDE.md
 .ipynb_checkpoints/
+steps.md

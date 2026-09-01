@@ -138,6 +138,8 @@ body.dark #disco-lights {
    TIPOGRAFÍA
 ══════════════════════════════════════════════════════ */
 h1 { font-family: var(--sans); font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { display: block; flex-shrink: 0; }
 h2 {
   font-size: 13px; font-weight: 700;
   color: var(--text2);

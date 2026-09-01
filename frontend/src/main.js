@@ -8,7 +8,10 @@ const app = document.getElementById("app");
 
 app.innerHTML = `
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:48px">
-    <h1>crisantemo</h1>
+    <div class="brand">
+      <img src="/logo.svg" alt="" width="32" height="32" />
+      <h1>crisantemo</h1>
+    </div>
     <button class="theme-btn" id="toggle-btn">◐ oscuro</button>
   </div>
   <div id="app-live-region" class="sr-only" aria-live="polite"></div>
