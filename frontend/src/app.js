@@ -11,7 +11,7 @@ import { analyzeAudio, AnalyzeError } from "./api/client.js";
 import { createRecorder, MicrophoneError } from "./audio/recorder.js";
 import { createLevelVisualizer } from "./audio/visualizer.js";
 import { startLiveStream, LiveStreamError } from "./audio/liveStream.js";
-import { renderScoreMeter } from "./components/scoreMeter.js";
+import { renderScoreMeter, animateScoreMeter } from "./components/scoreMeter.js";
 import { renderFeatureBars } from "./components/featureBars.js";
 import { createLiveGraph } from "./components/liveGraph.js";
 
@@ -168,6 +168,28 @@ export function initApp(root) {
     root.innerHTML = viewFor(state);
     wireEvents();
     announce(statusMessageFor(state));
+
+    // Transición corta entre vistas: #app-content se reemplaza por completo
+    // en cada render, así que la animación se retriggerea forzando un
+    // reflow entre quitar y volver a poner la clase (un cambio de clase
+    // solo no dispara la animación si la clase ya estaba puesta).
+    root.classList.remove("content-transition");
+    void root.offsetWidth;
+    root.classList.add("content-transition");
+
+    if (state.view === "idle") triggerBloomReveal();
+    if (state.view === "result") animateScoreMeter(root);
+    document.body.classList.toggle("is-analyzing", state.view === "analyzing");
+  }
+
+  function triggerBloomReveal() {
+    const items = root.querySelectorAll(".bloom-item");
+    requestAnimationFrame(() => {
+      items.forEach((el, i) => {
+        el.style.transitionDelay = `${i * 70}ms`;
+        el.classList.add("is-in");
+      });
+    });
   }
 
   render();
@@ -215,7 +237,7 @@ function viewFor(state) {
 
 function idleView() {
   return `
-    <div class="callout">
+    <div class="callout bloom-item">
       <div class="callout-title">Antes de empezar</div>
       <p>
         Esto es una herramienta de práctica y retroalimentación, no un diagnóstico. La puntuación
@@ -229,14 +251,14 @@ function idleView() {
       </p>
     </div>
 
-    <div class="onboard-row">
+    <div class="onboard-row bloom-item">
       <div class="onboard-num">1</div>
       <div>
         <h4>Busca un lugar silencioso</h4>
         <p class="muted">Sin ruido de fondo, el análisis es más confiable.</p>
       </div>
     </div>
-    <div class="onboard-row">
+    <div class="onboard-row bloom-item">
       <div class="onboard-num">2</div>
       <div>
         <h4>Habla por al menos 3-5 segundos</h4>
@@ -244,7 +266,7 @@ function idleView() {
       </div>
     </div>
 
-    <div class="card action-row">
+    <div class="card action-row bloom-item">
       <button class="btn primary" id="record-btn" type="button">● Grabar mi voz</button>
       <button class="btn" id="upload-btn" type="button">Subir un archivo de audio</button>
       <button class="btn" id="live-btn" type="button">▶ Modo en vivo</button>
@@ -275,7 +297,7 @@ function recordingView() {
       <canvas id="voice-bars" class="voice-bars" aria-hidden="true"></canvas>
       <div class="action-row">
         <p>Grabando… <span id="elapsed-time" class="mono-time">0:00</span></p>
-        <button class="btn primary" id="stop-btn" type="button">■ Detener y analizar</button>
+        <button class="btn primary is-recording" id="stop-btn" type="button">■ Detener y analizar</button>
       </div>
     </div>
   `;
@@ -284,7 +306,13 @@ function recordingView() {
 function analyzingView() {
   return `
     <div class="card" aria-busy="true">
-      <p>Analizando tu grabación…</p>
+      <p class="muted" style="margin-bottom:14px">Analizando tu grabación…</p>
+      <div class="skeleton skeleton-meter" aria-hidden="true"></div>
+      <div class="metrics-row" aria-hidden="true">
+        <div class="skeleton skeleton-metric"></div>
+        <div class="skeleton skeleton-metric"></div>
+        <div class="skeleton skeleton-metric"></div>
+      </div>
     </div>
   `;
 }

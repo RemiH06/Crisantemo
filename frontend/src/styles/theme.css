@@ -119,10 +119,14 @@ body {
   position: fixed; inset: 0;
   pointer-events: none; z-index: 0;
   mix-blend-mode: multiply;
+  transition: opacity .4s;
 }
 body.dark #disco-lights {
   mix-blend-mode: screen;
 }
+/* Se atenúa mientras se analiza una grabación, para no competir
+   visualmente con el estado de espera (funcional, dirige atención). */
+body.is-analyzing #disco-lights { opacity: .5; }
 
 /* ══════════════════════════════════════════════════════
    PÁGINA
@@ -132,6 +136,31 @@ body.dark #disco-lights {
   padding: 40px;
   max-width: 860px;
   margin: 0 auto;
+}
+
+/* Transición corta entre vistas del flujo (idle/grabando/analizando/
+   resultado/error): #app-content se reemplaza por completo en cada
+   re-render, así que se anima por reflow forzado en vez de depender de un
+   cambio de clase que no dispararía la animación por sí solo. */
+@keyframes content-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#app-content.content-transition {
+  animation: content-fade-in .3s cubic-bezier(.16, 1, .3, 1);
+}
+
+/* Apertura escalonada: los bloques de la pantalla inicial entran uno tras
+   otro, como pétalos, en vez de aparecer todos de golpe. El retraso entre
+   cada uno se fija por JS (transitionDelay) según su posición. */
+.bloom-item {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .5s cubic-bezier(.16, 1, .3, 1), transform .5s cubic-bezier(.16, 1, .3, 1);
+}
+.bloom-item.is-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -236,9 +265,19 @@ tr:hover td { background: var(--bg2); }
   text-decoration: none; letter-spacing: .01em;
 }
 .btn:hover         { border-color: var(--accent); color: var(--accent); background: var(--bg); }
+.btn:active         { transform: scale(.97); }
 .btn.primary       { background: var(--accent);  border-color: var(--accent);  color: var(--white); }
 .btn.primary:hover { opacity: .88; color: var(--white); }
 .btn:disabled      { opacity: .5; cursor: not-allowed; }
+
+/* Pulso del botón de detener grabación: indica "sigo escuchando", no es
+   decorativo. Color de --danger (universal para "grabando"), independiente
+   del color de fondo propio del botón (--accent). */
+@keyframes recording-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 0%, transparent); }
+}
+.btn.is-recording { animation: recording-pulse 1.8s ease-in-out infinite; }
 
 /* ══════════════════════════════════════════════════════
    BADGES
@@ -433,6 +472,11 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
   border: 2px solid var(--white);
   border-radius: 3px;
   box-shadow: 0 0 0 1px var(--black);
+  /* Anima de 0 al score real al aparecer (ver components/scoreMeter.js,
+     animateScoreMeter). Es el último momento del flujo, el que más se
+     recuerda (Peak-End Rule); el número sube junto con el marcador en vez
+     de aparecer de golpe. */
+  transition: left .7s cubic-bezier(.16, 1, .3, 1);
 }
 body.dark .score-meter-marker { background: var(--white); border-color: var(--black); box-shadow: 0 0 0 1px var(--white); }
 .score-meter-value {
@@ -441,6 +485,35 @@ body.dark .score-meter-marker { background: var(--white); border-color: var(--bl
   color: var(--text);
 }
 .score-meter-max { font-size: 16px; font-weight: 500; color: var(--text2); }
+
+/* ══════════════════════════════════════════════════════
+   SKELETON — estado "analizando", anticipa la forma del
+   resultado real (medidor + 3 métricas) en vez de un spinner
+   genérico o un vacío neutro.
+══════════════════════════════════════════════════════ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg3);
+  border-radius: var(--radius-sm);
+}
+.skeleton::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 16%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.skeleton-meter  { height: 14px; border-radius: 99px; margin: 4px 0 18px; }
+.skeleton-metric { flex: 1; min-width: 110px; height: 58px; }
 
 /* ══════════════════════════════════════════════════════
    DETAILS/SUMMARY — para el desglose completo de features
