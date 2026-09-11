@@ -1,46 +1,49 @@
 /* ══════════════════════════════════════════════════════
    TOKENS — MODO CLARO (default)
-   Tomado del theme "disco_theme". La paleta se puede cambiar
-   más adelante sin tocar ningún componente: todo está resuelto
-   con estas variables.
+   Paleta de crisantemo: cada tono existe de verdad en la flor
+   (oro, bronce, óxido, vino, magenta, lavanda, musgo), salvo
+   --flag-blue/--flag-blush, los únicos dos que no son florales
+   a propósito: son la bandera trans, la otra mitad del proyecto.
+   El logo no usa estas variables, tiene sus colores propios.
 ══════════════════════════════════════════════════════ */
 body {
-  --bg:      #FAFAF8;
-  --bg2:     #F2F1EE;
-  --bg3:     #E8E6E0;
+  --bg:      #FAF7F2;
+  --bg2:     #F1ECE3;
+  --bg3:     #E6DFD1;
 
-  --text:    #1A1814;
-  --text2:   #6A6560;
+  --text:    #241E16;
+  --text2:   #6E6355;
 
-  --border:  #D8D4CC;
+  --border:  #DCD3C2;
 
   /* ── Estado de interacción ──
-     new    → elemento nuevo · coral
-     active → en uso / seleccionado · índigo
-     done   → completado · verde menta */
-  --new:     #D94F3A;
-  --active:  #4A50C8;
-  --done:    #2A8C5A;
+     new    → elemento nuevo · óxido
+     active → en uso / seleccionado · lavanda
+     done   → completado · musgo */
+  --new:     #B0481F;
+  --active:  #8560B8;
+  --done:    #5B7A3A;
 
-  --tomato:  #D94F3A;
-  --indigo:  #4A50C8;
-  --mint:    #2A8C5A;
-  --mustard: #C07A10;
-  --lila:    #8A4AC8;
-  --peach:   #D4703A;
-  --sky:     #2A7AC8;
-  --rose:    #C84A70;
+  --gold:     #D9A32C; /* crisantemo amarillo, la variedad más común */
+  --bronze:   #C2701E; /* crisantemo bronce/cobrizo */
+  --rust:     #B0481F; /* crisantemo naranja quemado / terracota */
+  --wine:     #8A2A3B; /* crisantemo rojo oscuro, borgoña */
+  --magenta:  #B23368; /* crisantemo rosa fucsia intenso, tipo "spider mum" */
+  --lavender: #8560B8; /* crisantemo lavanda */
+  --moss:     #5B7A3A; /* hoja y tallo de crisantemo */
+  --flag-blue:  #5BCEFA; /* bandera trans, no floral a propósito */
+  --flag-blush: #F5A9B8; /* bandera trans, no floral a propósito */
 
-  --black:   #141210;
-  --white:   #FEFEFC;
-  --gray:    #A09890;
+  --black:   #1C1712;
+  --white:   #FEFCF8;
+  --gray:    #9C9186;
 
-  --accent:  #D94F3A;
-  --accent2: #4A50C8;
+  --accent:  #B0481F;
+  --accent2: #8560B8;
 
-  --ok:      #2A8C5A;
-  --warn:    #C07A10;
-  --danger:  #C82A2A;
+  --ok:      #5B7A3A;
+  --warn:    #D9A32C;
+  --danger:  #8A2A3B;
 
   --sans:    'Plus Jakarta Sans', system-ui, sans-serif;
   --mono:    'Fira Code', monospace;
@@ -51,41 +54,43 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════
-   TOKENS — MODO OSCURO
+   TOKENS — MODO OSCURO ("vino nocturno": casi negro con
+   tinte hacia el vino/borgoña, no un café/gris genérico)
 ══════════════════════════════════════════════════════ */
 body.dark {
-  --bg:      #1C1A18;
-  --bg2:     #242220;
-  --bg3:     #2E2C28;
+  --bg:      #1A1013;
+  --bg2:     #23161B;
+  --bg3:     #2C1D23;
 
-  --text:    #F0EDE8;
-  --text2:   #908880;
+  --text:    #F2EBDD;
+  --text2:   #A8919C;
 
-  --border:  #3A3830;
+  --border:  #3C2A31;
 
-  --new:     #FF6B52;
-  --active:  #6E74F0;
-  --done:    #3EC87A;
+  --new:     #E06A3A;
+  --active:  #A47FDB;
+  --done:    #7BA35A;
 
-  --tomato:  #FF6B52;
-  --indigo:  #6E74F0;
-  --mint:    #3EC87A;
-  --mustard: #F0A830;
-  --lila:    #B87AF0;
-  --peach:   #F09060;
-  --sky:     #50A8F0;
-  --rose:    #F06090;
+  --gold:     #F0BB46;
+  --bronze:   #E08C3E;
+  --rust:     #E06A3A;
+  --wine:     #C24558;
+  --magenta:  #D45C8C;
+  --lavender: #A47FDB;
+  --moss:     #7BA35A;
+  --flag-blue:  #5BCEFA;
+  --flag-blush: #F5A9B8;
 
-  --black:   #0E0C0A;
-  --white:   #F8F5F0;
-  --gray:    #605850;
+  --black:   #120C0E;
+  --white:   #F8F3EC;
+  --gray:    #6E5C64;
 
-  --accent:  #FF6B52;
-  --accent2: #6E74F0;
+  --accent:  #E06A3A;
+  --accent2: #A47FDB;
 
-  --ok:      #3EC87A;
-  --warn:    #F0A830;
-  --danger:  #F04040;
+  --ok:      #7BA35A;
+  --warn:    #F0BB46;
+  --danger:  #C24558;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -458,11 +463,11 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
   border: 1px solid var(--border);
   background: linear-gradient(
     90deg,
-    #5BCEFA 0%,
-    #F5A9B8 35%,
+    var(--flag-blue) 0%,
+    var(--flag-blush) 35%,
     #FFFFFF 50%,
-    #F5A9B8 65%,
-    #5BCEFA 100%
+    var(--flag-blush) 65%,
+    var(--flag-blue) 100%
   );
 }
 .score-meter-marker {

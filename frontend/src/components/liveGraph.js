@@ -5,7 +5,7 @@
 const MAX_POINTS = 60;
 
 function accentColor() {
-  return getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#D94F3A";
+  return getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#B0481F";
 }
 
 export function createLiveGraph(canvas) {

@@ -3,36 +3,34 @@
  * sobre un <canvas>. Tomado tal cual del demo de tema (disco_theme_demo.html),
  * solo envuelto en una función para poder inicializarlo desde main.js.
  *
- * Los colores de las luces siguen la paleta de tokens (--tomato, --indigo,
- * etc.); si se cambia la paleta en theme.css, basta con actualizar los
- * arreglos LIGHTS_LIGHT/LIGHTS_DARK de abajo para que coincidan.
- *
- * "sky" y "rose" (las dos más cercanas a azul/rosa) usan los tonos exactos
+ * Paleta de crisantemo: 6 de las 8 luces son tonos reales de la flor (oro,
+ * bronce, óxido, magenta, lavanda, musgo); las otras 2 son los tonos exactos
  * de la bandera trans (#5BCEFA / #F5A9B8, los mismos que ya usan el logo y
- * el medidor de score), en vez de un azul/rosa genérico. El resto de la
- * paleta disco se dejó igual a propósito, no es un retema completo.
+ * el medidor de score), no floral a propósito. Si se cambia la paleta en
+ * theme.css (--gold, --bronze, etc.), hay que actualizar también estos
+ * arreglos a mano: son RGB planos para el canvas, no leen custom properties.
  */
 
 const LIGHTS_LIGHT = [
-  { r: 255, g: 100, b: 80 }, // tomato
-  { r: 74, g: 80, b: 200 }, // indigo
-  { r: 42, g: 140, b: 90 }, // mint
-  { r: 192, g: 122, b: 16 }, // mustard
-  { r: 138, g: 74, b: 200 }, // lila
-  { r: 212, g: 112, b: 58 }, // peach
-  { r: 91, g: 206, b: 250 }, // sky -> #5BCEFA (bandera trans)
-  { r: 245, g: 169, b: 184 }, // rose -> #F5A9B8 (bandera trans)
+  { r: 176, g: 72, b: 31 }, // rust -> #B0481F
+  { r: 133, g: 96, b: 184 }, // lavender -> #8560B8
+  { r: 91, g: 122, b: 58 }, // moss -> #5B7A3A
+  { r: 217, g: 163, b: 44 }, // gold -> #D9A32C
+  { r: 178, g: 51, b: 104 }, // magenta -> #B23368
+  { r: 194, g: 112, b: 30 }, // bronze -> #C2701E
+  { r: 91, g: 206, b: 250 }, // flag-blue -> #5BCEFA (bandera trans)
+  { r: 245, g: 169, b: 184 }, // flag-blush -> #F5A9B8 (bandera trans)
 ];
 
 const LIGHTS_DARK = [
-  { r: 255, g: 107, b: 82 },
-  { r: 110, g: 116, b: 240 },
-  { r: 62, g: 200, b: 122 },
-  { r: 240, g: 168, b: 48 },
-  { r: 184, g: 122, b: 240 },
-  { r: 240, g: 144, b: 96 },
-  { r: 91, g: 206, b: 250 }, // sky -> #5BCEFA (bandera trans, ya suficientemente clara para fondo oscuro)
-  { r: 245, g: 169, b: 184 }, // rose -> #F5A9B8 (bandera trans)
+  { r: 224, g: 106, b: 58 }, // rust -> #E06A3A
+  { r: 164, g: 127, b: 219 }, // lavender -> #A47FDB
+  { r: 123, g: 163, b: 90 }, // moss -> #7BA35A
+  { r: 240, g: 187, b: 70 }, // gold -> #F0BB46
+  { r: 212, g: 92, b: 140 }, // magenta -> #D45C8C
+  { r: 224, g: 140, b: 62 }, // bronze -> #E08C3E
+  { r: 91, g: 206, b: 250 }, // flag-blue -> #5BCEFA (bandera trans, ya suficientemente clara para fondo oscuro)
+  { r: 245, g: 169, b: 184 }, // flag-blush -> #F5A9B8 (bandera trans)
 ];
 
 function makeLights(cols) {

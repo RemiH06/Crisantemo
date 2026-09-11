@@ -13,7 +13,7 @@
 const BAR_COUNT = 24;
 
 function themeAccentColor() {
-  return getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#D94F3A";
+  return getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#B0481F";
 }
 
 function sizeCanvas(canvas) {
