@@ -210,6 +210,26 @@ Con ambos bugs corregidos, comparado contra las 5 grabaciones reales:
 
 **"Aguda actuada nueva" cruzó al lado masculino por primera vez en toda la investigación.** Las tres voces masculinas se mantienen correctamente clasificadas, con algo más de margen que antes pero sin cruzar. "Aguda actuada" (la primera, F0 más bajo que la nueva pero aun así el caso más extremo del set) sigue sin cruzar. Mejora real y medible, todavía no una solución completa.
 
+## 4.10. Subir el peso adversarial de 5x a 10x: mejora clara en la prueba automática, pero con un riesgo nuevo encontrado
+
+Siguiente experimento, barato porque no necesita re-extraer features: barrer `--adversarial-weight` de 5 a 20 y comparar contra `05_evaluate_model.py` (accuracy general de test + accuracy en los 242 casos adversariales sintéticos del split de test).
+
+| Peso | Accuracy general (test) | Accuracy en adversariales sintéticos | Peso combinado de F0 |
+|---|---|---|---|
+| 5 (anterior) | 81.7% | 85.5% | 31.3% |
+| 8 | 80.0% | 88.8% | 31.5% |
+| 10 | 79.5% | 91.7% | 30.1% |
+| 15 | 77.4% | 92.1% | 29.0% |
+| 20 | 76.3% | 93.8% | 27.8% |
+
+Tendencia clara y monótona: más peso adversarial mejora la robustez a casos donde tono y formantes van en direcciones opuestas, a costa de accuracy general. El usuario eligió 10 (mejor relación ganancia/costo, los pesos de 15 y 20 ya son retornos decrecientes). Modelo reentrenado, recalibrado (mismo procedimiento `FrozenEstimator` de 4.9) y exportado a `models/crisantemo_v1.joblib`.
+
+**Riesgo nuevo encontrado al verificar con la prueba de estrés manual de la sección 5** (4 voces sintéticas de control, un solo trazo de ruido cada una): con la voz "grave + formantes masculinos" (f0=100Hz, formantes 730/1090/2440, un caso NO adversarial, pitch y formantes ya apuntan los dos a masculino) el score subió de forma monótona con el peso: 34.2 (peso 1) → 54.1 (peso 5) → 74.0 (peso 10), cruzando a "feminino" en vez de quedarse masculino. Investigando la causa: Praat/Burg mide mal F1 en esta síntesis específica (extrae 869Hz cuando el objetivo era 730Hz, probablemente porque a F0=100Hz los armónicos son tan espaciados que el 8vo/9no armónico, cerca de 800-900Hz, se confunde con el pico de F1), lo que colapsa `f2_f1_diff_hz` a 269.8 (más estrecho que cualquier caso femenino real del dataset). Subir el peso adversarial hace que el modelo dependa más de `f2_f1_diff_hz` específicamente, así que amplifica el efecto de este ruido de medición en vez de solo corregir los casos adversariales genuinos.
+
+Con la misma prueba, el caso "agudo + formantes femeninos" (consistente, debería ser confiablemente femenino) tampoco se clasifica con confianza en ningún peso (54.6 / 42.8 / 53.9): sugiere que la prueba de estrés manual de la sección 5, tal como está escrita hoy (un solo trazo de síntesis por caso, con un `rng` compartido y mutado secuencialmente entre casos, sin repetir con más semillas), es ruidosa por sí misma y no es una señal confiable para decidir esto sola. La prueba automática de `05_evaluate_model.py` (242 ejemplos, no 1) sigue siendo la señal más confiable de las dos, pero ninguna reemplaza probar con voz real.
+
+**Implicación práctica:** el modelo exportado con peso 10 no se puede dar por bueno solo con la prueba automática. Falta que el usuario reconfirme en el frontend, con grabaciones reales: (a) si "aguda actuada" por fin cruza a masculino, y (b) que las voces masculinas ya confirmadas (voz normal, voz más grave, grave actuada) no se hayan movido hacia femenino por este mismo efecto. Si (b) falla, es evidencia de que este riesgo del formant-tracking a F0 bajo también aplica a voz real grave, no solo a la síntesis de prueba, y valdría la pena retomar la idea pausada de pitch-normalizar antes de medir formantes (ver cierre de la sección 4.8), que ataca la causa raíz en vez de compensarla con más peso.
+
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
 Para confirmar que el modelo usa resonancia y no solo pitch, se generaron cuatro voces sintéticas de control cruzando pitch y formantes en direcciones opuestas, y se les pidió el score al modelo crudo (antes de calibrar):
