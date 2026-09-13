@@ -230,6 +230,20 @@ Con la misma prueba, el caso "agudo + formantes femeninos" (consistente, deberí
 
 **Implicación práctica:** el modelo exportado con peso 10 no se puede dar por bueno solo con la prueba automática. Falta que el usuario reconfirme en el frontend, con grabaciones reales: (a) si "aguda actuada" por fin cruza a masculino, y (b) que las voces masculinas ya confirmadas (voz normal, voz más grave, grave actuada) no se hayan movido hacia femenino por este mismo efecto. Si (b) falla, es evidencia de que este riesgo del formant-tracking a F0 bajo también aplica a voz real grave, no solo a la síntesis de prueba, y valdría la pena retomar la idea pausada de pitch-normalizar antes de medir formantes (ver cierre de la sección 4.8), que ataca la causa raíz en vez de compensarla con más peso.
 
+## 4.11. Confirmado con voz real: peso 10 rompe casos fáciles, se revierte a 5
+
+El riesgo de la sección 4.10 se confirmó, y peor de lo anotado ahí: el usuario probó el modelo con peso 10 en producción y lo describió como "no tiene ni pies ni cabeza, funciona mucho peor que el anterior". Un sanity check rápido con voces sintéticas de control (no adversariales, tono y formantes apuntando ambos a la misma dirección) confirmó el problema con números:
+
+| Caso (sintético, no adversarial) | Peso 10 | Peso 5 (revertido) |
+|---|---|---|
+| Grave + formantes masculinos (debería ser claramente masculino) | **57.3** | 25.2 |
+| Aguda + formantes femeninos (debería ser claramente femenino) | 72.4 | 75.4 |
+| Femenina algo más grave | 50.9 | 48.6 |
+
+Con peso 10, una voz masculina de manual (sin ninguna ambigüedad) puntuaba 57.3, prácticamente una moneda al aire, no solo el caso límite "aguda actuada" que se estaba intentando arreglar. La ganancia en la prueba de estrés adversarial (85.5%→91.7%) no valía ese costo: el modelo dejó de funcionar bien en los casos fáciles y comunes para mejorar marginalmente en los casos raros/extremos. Confirma en voz real lo que 4.10 ya sospechaba solo con síntesis de prueba: subir el peso adversarial hace al modelo depender más de `f2_f1_diff_hz`, y esa dependencia extra sale cara en casos normales, no solo en el edge case de F0 bajo con formant-tracking ruidoso.
+
+**Se revirtió a `--adversarial-weight 5`** (el valor de la sección 4.9, ya validado con las 5 grabaciones reales). `models/crisantemo_v1.joblib` vuelve a ese estado. El pendiente de "aguda actuada" (el único de los 5 casos de prueba que nunca cruzó a masculino) sigue abierto, pero subir el peso adversarial a secas queda descartado como camino: ya se probó en dos direcciones (10 y hasta 20 en el barrido de 4.10) y el costo en casos fáciles es real, no hipotético. Caminos que siguen abiertos, sin este descartado: pitch-normalizar antes de medir formantes, o una arquitectura híbrida con piso de peso garantizado para features de resonancia (ambos ya anotados en el cierre de 4.8).
+
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
 Para confirmar que el modelo usa resonancia y no solo pitch, se generaron cuatro voces sintéticas de control cruzando pitch y formantes en direcciones opuestas, y se les pidió el score al modelo crudo (antes de calibrar):

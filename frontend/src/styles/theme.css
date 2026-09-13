@@ -104,7 +104,12 @@ body {
   font-family: var(--sans);
   font-size: 14px;
   line-height: 1.7;
-  transition: background .25s, color .25s;
+  /* Sin transición por default: si no, el primer pintado podría animar
+     desde el tema equivocado (claro) al correcto (oscuro por sistema o
+     guardado) antes de que theme/themeToggle.js alcance a marcar body.dark.
+     Se activa a los ~20ms desde JS, ya con el tema correcto puesto, así que
+     solo el toggle manual del usuario se ve animado. */
+  transition: background 0s, color 0s;
 }
 
 ::-webkit-scrollbar { width: 5px; }
@@ -431,6 +436,19 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
 .action-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .mono-time { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
+/* Estado de espera del modo en vivo, mientras llega el primer score_update
+   (ver app.js, handleLiveClick). Funcional: comunica "conectado, esperando
+   suficiente voz", no un simple "…" estático que podría leerse como colgado. */
+.mono-time.is-waiting {
+  color: var(--text2);
+  font-weight: 500;
+  animation: waiting-pulse 1.6s ease-in-out infinite;
+}
+@keyframes waiting-pulse {
+  0%, 100% { opacity: .45; }
+  50%      { opacity: 1; }
+}
+
 /* Barras de nivel en vivo durante la grabación, ver audio/visualizer.js.
    Decorativas (aria-hidden), no dependen de JS para tener un tamaño válido. */
 .voice-bars {
@@ -485,11 +503,33 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 32px 0; 
 }
 body.dark .score-meter-marker { background: var(--white); border-color: var(--black); box-shadow: 0 0 0 1px var(--white); }
 .score-meter-value {
+  position: relative;
   margin-top: 10px;
   font-size: 32px; font-weight: 700; letter-spacing: -.5px;
   color: var(--text);
 }
 .score-meter-max { font-size: 16px; font-weight: 500; color: var(--text2); }
+
+/* Acento de floración: unos pocos pétalos que se dispersan desde el número
+   al momento de aparecer el resultado, ver components/scoreMeter.js
+   (spawnPetalBurst). El contenedor no ocupa espacio (width/height:0), los
+   pétalos se posicionan desde ese mismo punto vía --petal-dx/--petal-dy. */
+.score-meter-petals {
+  position: absolute; left: 4px; top: 50%;
+  width: 0; height: 0;
+  pointer-events: none;
+}
+.score-meter-petal {
+  position: absolute; left: 0; top: 0;
+  width: 8px; height: 13px; border-radius: 50%;
+  opacity: .85;
+  transform: translate(-50%, -50%) scale(.5) rotate(0deg);
+  transition: transform .9s cubic-bezier(.16, 1, .3, 1), opacity .9s ease-out;
+}
+.score-meter-petal.is-drifting {
+  opacity: 0;
+  transform: translate(calc(-50% + var(--petal-dx)), calc(-50% + var(--petal-dy))) scale(1) rotate(var(--petal-rot));
+}
 
 /* ══════════════════════════════════════════════════════
    SKELETON — estado "analizando", anticipa la forma del

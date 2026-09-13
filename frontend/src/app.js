@@ -112,12 +112,29 @@ export function initApp(root) {
     const canvas = document.getElementById("live-graph");
     if (canvas) liveGraph = createLiveGraph(canvas);
 
+    let displayedScore = 0;
+    let hasFirstUpdate = false;
+
     try {
       stopLiveStreamFn = await startLiveStream({
         onUpdate: (data) => {
           liveGraph?.push(data.score_smoothed);
           const valueEl = document.getElementById("live-score-value");
-          if (valueEl) valueEl.textContent = Math.round(data.score_smoothed);
+          if (!valueEl) return;
+          if (!hasFirstUpdate) {
+            hasFirstUpdate = true;
+            displayedScore = data.score_smoothed;
+            valueEl.classList.remove("is-waiting");
+            valueEl.textContent = Math.round(displayedScore);
+            return;
+          }
+          // Desliza del valor mostrado al nuevo en vez de saltar de golpe: las
+          // actualizaciones llegan cada STEP_SECONDS (1.2s, ver
+          // backend/app/streaming/session.py), más lento que este deslizado
+          // (500ms), así que no se encima con la siguiente actualización.
+          glideLiveScoreValue(valueEl, displayedScore, data.score_smoothed, (finalValue) => {
+            displayedScore = finalValue;
+          });
         },
         onError: () => {
           setState({ view: "error", message: "Se perdió la conexión del modo en vivo. Intenta de nuevo." });
@@ -130,6 +147,25 @@ export function initApp(root) {
       }
       throw err;
     }
+  }
+
+  function glideLiveScoreValue(el, from, to, onDone) {
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    if (reduceMotion) {
+      el.textContent = Math.round(to);
+      onDone(to);
+      return;
+    }
+    const durationMs = 500;
+    const startTime = performance.now();
+    function tick(now) {
+      const progress = Math.min(1, (now - startTime) / durationMs);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(from + (to - from) * eased);
+      if (progress < 1) requestAnimationFrame(tick);
+      else onDone(to);
+    }
+    requestAnimationFrame(tick);
   }
 
   function handleStopLiveClick() {
@@ -280,8 +316,8 @@ function liveView() {
     <div class="card">
       <canvas id="live-graph" class="live-graph" aria-hidden="true"></canvas>
       <div class="action-row" style="margin-top:12px">
-        <p>Score en vivo: <span id="live-score-value" class="mono-time">…</span></p>
-        <button class="btn primary" id="stop-live-btn" type="button">■ Detener</button>
+        <p>Score en vivo: <span id="live-score-value" class="mono-time is-waiting">Escuchando…</span></p>
+        <button class="btn primary is-recording" id="stop-live-btn" type="button">■ Detener</button>
       </div>
     </div>
     <p class="muted">
