@@ -365,14 +365,14 @@ function resultView(result, audioUrl) {
   ).join("");
 
   const suggestions = feedback.suggestions
-    .map((s) => `<li>${escapeHtml(s)}</li>`)
+    .map((s) => `<li class="suggestion suggestion-${s.kind}">${escapeHtml(s.text)}</li>`)
     .join("");
 
   return `
     <div class="card">
       ${renderScoreMeter(score)}
       <p>${escapeHtml(feedback.summary)}</p>
-      <ul>${suggestions}</ul>
+      <ul class="suggestion-list">${suggestions}</ul>
     </div>
 
     <div class="card">

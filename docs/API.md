@@ -39,7 +39,9 @@ Sube un audio completo (multipart) y recibe el análisis.
   "feedback": {
     "summary": "string",
     "tone": "supportive",
-    "suggestions": ["string"]
+    "suggestions": [
+      { "text": "string", "kind": "acierto" }
+    ]
   },
   "meta": {
     "voiced_seconds": 0,
@@ -49,6 +51,8 @@ Sube un audio completo (multipart) y recibe el análisis.
 ```
 
 Los nombres de `features` deben coincidir exactamente con `models/feature_schema_v1.json` y con `shared/acoustic_features.FEATURE_NAMES`; el backend valida este contrato al arrancar.
+
+Cada `suggestion.kind` es uno de `acierto` (verde, algo que ya va bien), `sugerencia` (azul, tip accionable), `advertencia` (amarillo, algo a tener en cuenta de la grabación, no del habla en sí) o `problema` (rojo, un desajuste real que vale la pena trabajar). Nunca es un veredicto de "aprobado/reprobado" (ver `docs/ETHICS_PRIVACY.md`); el frontend los pinta con símbolo + color en vez de una lista plana (`frontend/src/styles/theme.css`, clases `.suggestion-*`).
 
 **Límites del archivo subido** (`backend/app/audio/decode.py`): 20MB de tamaño, 2 minutos de duración decodificada. Generosos a propósito, ninguna grabación de práctica real se les acerca; son solo para no procesar una subida absurda por accidente o abuso.
 

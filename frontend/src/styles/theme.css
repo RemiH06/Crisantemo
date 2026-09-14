@@ -248,6 +248,53 @@ pre code { background: none; border: none; padding: 0; color: inherit; }
 .callout.active  { border-color: var(--active);  } .callout.active  .callout-title { color: var(--active);  }
 
 /* ══════════════════════════════════════════════════════
+   SUGERENCIAS DE RESULTADO — 4 categorías, símbolo + color,
+   nunca "aprobado/reprobado" (ver docs/ETHICS_PRIVACY.md):
+   acierto (verde) = algo que ya va bien; sugerencia (azul) = tip
+   accionable; advertencia (amarillo) = algo a tener en cuenta de
+   la grabación, no del habla en sí; problema (rojo) = un desajuste
+   real que vale la pena trabajar. Ver backend/app/scoring/feedback.py.
+══════════════════════════════════════════════════════ */
+.suggestion-list { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.suggestion {
+  position: relative;
+  padding: 10px 14px 10px 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.suggestion::before {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.suggestion-acierto {
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+  background: color-mix(in srgb, var(--ok) 8%, var(--bg2));
+}
+.suggestion-acierto::before { content: "✓"; color: var(--ok); }
+.suggestion-sugerencia {
+  border-color: color-mix(in srgb, var(--flag-blue) 45%, var(--border));
+  background: color-mix(in srgb, var(--flag-blue) 10%, var(--bg2));
+}
+.suggestion-sugerencia::before { content: "→"; color: color-mix(in srgb, var(--flag-blue) 70%, var(--text)); }
+.suggestion-advertencia {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: color-mix(in srgb, var(--warn) 8%, var(--bg2));
+}
+.suggestion-advertencia::before { content: "⚠"; color: var(--warn); }
+.suggestion-problema {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg2));
+}
+.suggestion-problema::before { content: "✕"; color: var(--danger); }
+
+/* ══════════════════════════════════════════════════════
    TABLA
 ══════════════════════════════════════════════════════ */
 table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }

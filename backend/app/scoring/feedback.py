@@ -44,43 +44,73 @@ def build_feedback(score: float, features: AcousticFeatures) -> dict:
     gap = score - pitch_only
 
     summary = f"Esta grabación puntuó {score:.1f}/100, {_score_band(score)}."
-    suggestions: list[str] = []
+    suggestions: list[dict] = []
 
     if gap > _PITCH_RESONANCE_GAP_THRESHOLD:
-        summary += (
-            " Tu tono por sí solo sugeriría un puntaje más bajo, pero tu resonancia "
-            "(formantes) es lo que más está subiendo tu score. Es justo lo que "
-            "Crisantemo busca medir: no hace falta forzar un tono más agudo si la "
-            "resonancia ya está haciendo el trabajo."
+        suggestions.append(
+            {
+                "kind": "acierto",
+                "text": (
+                    "Tu tono por sí solo sugeriría un puntaje más bajo, pero tu resonancia "
+                    "(formantes) es lo que más está subiendo tu score. Es justo lo que "
+                    "Crisantemo busca medir: no hace falta forzar un tono más agudo si la "
+                    "resonancia ya está haciendo el trabajo."
+                ),
+            }
         )
     elif gap < -_PITCH_RESONANCE_GAP_THRESHOLD:
-        summary += (
-            " Tu tono por sí solo sugeriría un puntaje más alto, pero tu resonancia "
-            "(formantes) todavía no lo acompaña."
+        suggestions.append(
+            {
+                "kind": "problema",
+                "text": (
+                    "Tu tono por sí solo sugeriría un puntaje más alto, pero tu resonancia "
+                    "(formantes) todavía no lo acompaña."
+                ),
+            }
         )
         suggestions.append(
-            "Antes de subir más el tono, vale más la pena trabajar la resonancia "
-            "(colocación de la voz más adelante, ejercicios de humming); forzar un "
-            "tono agudo sin ese trabajo puede cansar la voz sin mover mucho el score."
+            {
+                "kind": "sugerencia",
+                "text": (
+                    "Antes de subir más el tono, vale más la pena trabajar la resonancia "
+                    "(colocación de la voz más adelante, ejercicios de humming); forzar un "
+                    "tono agudo sin ese trabajo puede cansar la voz sin mover mucho el score."
+                ),
+            }
         )
 
     if features.hnr_db < _LOW_HNR_DB:
         suggestions.append(
-            "La claridad de la voz (relación armónico-ruido) salió baja en esta "
-            "grabación; puede ser ruido de fondo o una voz más soplada de lo usual. "
-            "Vale la pena repetir la grabación en un lugar más silencioso."
+            {
+                "kind": "advertencia",
+                "text": (
+                    "La claridad de la voz (relación armónico-ruido) salió baja en esta "
+                    "grabación; puede ser ruido de fondo o una voz más soplada de lo usual. "
+                    "Vale la pena repetir la grabación en un lugar más silencioso."
+                ),
+            }
         )
 
     if features.voiced_seconds < _LOW_VOICED_SECONDS:
         suggestions.append(
-            "Se detectó poca voz sonora en la grabación; una toma un poco más larga "
-            "da un análisis más estable."
+            {
+                "kind": "advertencia",
+                "text": (
+                    "Se detectó poca voz sonora en la grabación; una toma un poco más larga "
+                    "da un análisis más estable."
+                ),
+            }
         )
 
     if not suggestions:
         suggestions.append(
-            "Sigue practicando con grabaciones variadas para ver qué tan consistente "
-            "se mantiene tu resonancia."
+            {
+                "kind": "sugerencia",
+                "text": (
+                    "Sigue practicando con grabaciones variadas para ver qué tan consistente "
+                    "se mantiene tu resonancia."
+                ),
+            }
         )
 
     return {"summary": summary, "tone": "supportive", "suggestions": suggestions}

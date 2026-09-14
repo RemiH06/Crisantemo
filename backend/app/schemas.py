@@ -33,10 +33,20 @@ class MetaOut(BaseModel):
     duration_seconds: float
 
 
+class SuggestionOut(BaseModel):
+    text: str
+    # acierto (verde) = algo que ya va bien; sugerencia (azul) = tip
+    # accionable; advertencia (amarillo) = algo a tener en cuenta, no del
+    # habla en sí (ej. calidad de grabación); problema (rojo) = un
+    # desajuste real que vale la pena trabajar. Nunca "aprobado/reprobado",
+    # ver docs/ETHICS_PRIVACY.md.
+    kind: Literal["acierto", "sugerencia", "advertencia", "problema"]
+
+
 class FeedbackOut(BaseModel):
     summary: str
     tone: Literal["supportive"] = "supportive"
-    suggestions: list[str]
+    suggestions: list[SuggestionOut]
 
 
 class AnalyzeResponse(BaseModel):
