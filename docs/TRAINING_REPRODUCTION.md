@@ -244,6 +244,46 @@ Con peso 10, una voz masculina de manual (sin ninguna ambigüedad) puntuaba 57.3
 
 **Se revirtió a `--adversarial-weight 5`** (el valor de la sección 4.9, ya validado con las 5 grabaciones reales). `models/crisantemo_v1.joblib` vuelve a ese estado. El pendiente de "aguda actuada" (el único de los 5 casos de prueba que nunca cruzó a masculino) sigue abierto, pero subir el peso adversarial a secas queda descartado como camino: ya se probó en dos direcciones (10 y hasta 20 en el barrido de 4.10) y el costo en casos fáciles es real, no hipotético. Caminos que siguen abiertos, sin este descartado: pitch-normalizar antes de medir formantes, o una arquitectura híbrida con piso de peso garantizado para features de resonancia (ambos ya anotados en el cierre de 4.8).
 
+## 4.12. ¿Ayudaría agregar otros idiomas? Explorado con datos reales, respuesta: no es gratis
+
+Pregunta del usuario: como las 12 features son acústicas (no dependen del idioma ni de qué se dijo), ¿serviría agregar Common Voice de otros países/idiomas para tener más datos reales? Se investigó con datos de verdad en vez de asumir: se descargaron 250 clips por género de inglés estadounidense, neerlandés y árabe (mismos datasets "MDC Curators" gender-curated que ya se usan para es-mx, ver `LANGUAGE_DATASETS` en `01_download_dataset.py`), y se comparó contra es-mx en `training/notebooks/feature_analysis.ipynb` sección 6.
+
+**La dirección del efecto de género es la misma en los 4 idiomas, en las 12 features** (F0 más alto en femenino, jitter/shimmer más altos en masculino, HNR más alto en femenino, siempre). Confirma que el patrón es físico, no un artefacto del idioma. Pero **el tamaño de la brecha varía, y no a favor de la resonancia**: el espaciado F2-F1 separa géneros por ~66-84 Hz en es-mx/en-US/árabe, pero en neerlandés casi se invierte (masculino 1149.6 vs femenino 1133.5). El neerlandés también tiene el HNR más bajo de los 4 para ambos géneros a la vez (11.8/8.6 contra 14-15/9-11 en los demás), señal más probable de calidad de grabación del subset que de una diferencia real de habla regional, aunque con solo 250 clips por género no se puede afirmar con certeza.
+
+**Conclusión práctica: agregar estos idiomas al entrenamiento real no es "más datos gratis mejor".** La señal de resonancia, ya débil de por sí (AUC 0.57-0.73 en es-mx, sección 3 del notebook), se ve todavía más débil o invertida en al menos uno de los 3 idiomas nuevos. Mezclarlos sin cuidado arriesga diluir más la señal de formantes que reforzarla. No se agregó nada al pipeline de entrenamiento (`02_prepare_labels.py`/`03_extract_features.py` no tocan estos datos, la comparación se hizo en memoria dentro del notebook); si se retoma este camino, lo primero sería descargar más de 250 clips por idioma para confirmar si el patrón de neerlandés es real o ruido de muestra chica.
+
+## 4.13. "Aguda actuada" no cae en NINGÚN clúster: es un outlier en 3 ejes a la vez, no solo en F0
+
+Pregunta del usuario, motivada por ver que en el scatter matrix (sección 5 del notebook) los géneros se separan de forma bastante homogénea: ¿el modelo podría puntuar según qué tan bien encaja una voz dentro de su clúster, en vez de solo clasificar? Se construyó una vista 3D (F0 x HNR x F3, color por shimmer con dos escalas distintas por género, sección 5.1 del notebook) con los 5 casos de prueba reales superpuestos, y se calculó el percentil exacto de cada caso contra cada clúster en esos 3 ejes:
+
+| Caso | vs. femenino (F0 / HNR / F3) | vs. masculino (F0 / HNR / F3) |
+|---|---|---|
+| Aguda actuada | 100% / 100% / **0%** | 100% / 100% / **0%** |
+| Aguda actuada nueva | 100% / 100% / **0%** | 100% / 100% / **0%** |
+| Grave actuada | 0% / 4% / 15% | 28% / 26% / 41% |
+| Voz normal | 0% / 6% / 2% | 11% / 39% / 5% |
+| Voz más grave | 0% / 9% / 5% | 2% / 49% / 13% |
+
+**Los dos casos "aguda actuada" no caen adentro de ningún clúster: son outliers extremos en los 3 ejes a la vez**, no solo en F0 como ya se sabía (sección 4.5/conclusiones del notebook). Están en el percentil más alto del dataset en F0 y en HNR, y al mismo tiempo en el percentil más bajo en F3, para cualquiera de los dos géneros. El modelo no tiene ninguna zona de entrenamiento cerca de ese punto; está extrapolando a ciegas, no ignorando la resonancia a propósito. Las tres voces masculinas bien clasificadas, en cambio, caen en percentiles moderados (26-49%) contra su clúster: son ejemplos típicos, no casos límite.
+
+**Implicación:** esto es evidencia concreta a favor de complementar (no necesariamente reemplazar) el clasificador actual con una señal de "qué tan típica es esta voz de algo que el modelo ya vio" (ej. `QuadraticDiscriminantAnalysis` o una mezcla de gaussianas por género en sklearn, comparando verosimilitud contra ambos clústers en vez de solo la frontera de decisión de LightGBM). Un caso "aguda actuada" habría salido con baja confianza/alta atipicidad bajo ese enfoque, coincidiendo con que hoy el modelo simplemente no sabe qué hacer con él. No implementado todavía, queda como siguiente experimento candidato junto con pitch-normalizar formantes y la arquitectura híbrida (cierre de 4.8).
+
+## 4.14. Confirmado con jitter/shimmer reales: forzar el tono limpia la fonación de verdad, no es un artefacto de grabación
+
+La sección 4.13 solo tenía 6 de las 12 features para los casos de prueba (`known_cases` nunca capturó jitter/shimmer). El usuario grabó 5 pruebas nuevas con el desglose completo desde el frontend (modelo con peso 5): aguda actuada, grave actuada, y 3 grabaciones "regular" de control (mismo micrófono/cuarto, para aislar si el patrón es de grabación o de la voz). Percentil contra el dataset real de entrenamiento:
+
+| Caso | F0 | Jitter | Shimmer | HNR |
+|---|---|---|---|---|
+| Aguda actuada (342 Hz) | 100% | **0%** | **0%** | 100% |
+| Grave actuada (105 Hz) | 0-3% | 30-61% | 0-2% | 84-99% |
+| Regular x3 (107-118 Hz) | 0-17% | 23-94% | 3-80% | 10-93% |
+
+**"Aguda actuada" es un outlier cuádruple: F0 más alto que cualquier grabación de entrenamiento, y jitter/shimmer más bajos que absolutamente cualquiera, con HNR más alto que cualquiera.** Las 3 grabaciones "regular", mismo setup, caen en percentiles normales y dispersos (10-94%): descarta que sea el micrófono o el cuarto. Solo al forzar el tono a 342 Hz la fonación se vuelve anormalmente "limpia" en las 3 métricas de perturbación a la vez. Confirma con datos reales la hipótesis: es una firma fisiológica real de forzar el tono muy por fuera del registro cómodo (vibración de cuerdas vocales más simple/periódica), no ruido de medición ni de grabación.
+
+Detalle adicional: esta vez F3 no salió extremo (percentil 27-62%, normal), a diferencia de los casos de 4.13 donde sí lo era. Jitter/shimmer/HNR parece ser la señal más consistente de "esto es tono forzado" entre sesiones de grabación distintas, más que F3. "Grave actuada" muestra una versión más chica del mismo patrón (shimmer bajo, HNR alto vs. las 3 "regular"), sugiriendo que cualquier actuación de voz limpia la fonación algo, y forzarla muy lejos del registro cómodo la limpia mucho.
+
+**Siguiente experimento propuesto, no implementado todavía:** ampliar `_dev_synthetic_decorrelated.py` para que los ejemplos adversariales de F0 extremo también bajen jitter/shimmer y suban HNR de forma correlacionada (no solo variar F0), en vez de dejar el ruido de síntesis fijo o aleatorio sin relación con qué tan extremo es el F0. Es la versión afinada, ahora validada con datos reales, del pendiente "correlacionar severidad de jitter/shimmer con el género" que ya estaba anotado en el cierre de 4.8.
+
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
 Para confirmar que el modelo usa resonancia y no solo pitch, se generaron cuatro voces sintéticas de control cruzando pitch y formantes en direcciones opuestas, y se les pidió el score al modelo crudo (antes de calibrar):

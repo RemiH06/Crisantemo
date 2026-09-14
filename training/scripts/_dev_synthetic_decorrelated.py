@@ -52,6 +52,24 @@ F0_RANGES = {
     "very_high": (280, 400),
 }
 
+# Confirmado con grabaciones reales nuevas (ver docs/TRAINING_REPRODUCTION.md
+# sección 4.14): forzar el tono muy por fuera del registro cómodo no solo
+# sube F0, también limpia la fonación de verdad (jitter/shimmer bajísimos,
+# HNR altísimo comparado con voz normal de la misma persona, mismo
+# micrófono). No es ruido de grabación, es una firma fisiológica real de
+# tono forzado. Antes, el rango very_high se sintetizaba con el mismo
+# jitter/shimmer/ruido "normal" que low/high, así que el modelo nunca vio
+# esa combinación específica (F0 extremo + fonación anormalmente limpia)
+# etiquetada como masculina. Estos rangos, calibrados empíricamente contra
+# esa grabación real, son deliberadamente un rango angosto (no un valor
+# fijo, para no repetir el error de "huella digital sintética" de la
+# sección 4.7) muy por debajo de los defaults de synth_vowel().
+VERY_HIGH_F0_NOISE_RANGES = {
+    "jitter_std": (0.001, 0.004),
+    "shimmer_std": (0.003, 0.010),
+    "noise_std": (0.0001, 0.0006),
+}
+
 # Media y desviación estándar de F1/F2/F3 por género, calculadas sobre los
 # datos reales de entrenamiento (ver training/notebooks/feature_analysis.ipynb).
 # Antes se usaban dos formantes FIJOS exactos (730/1090/2440 y 850/1650/2950,
@@ -102,7 +120,13 @@ def main() -> None:
                 for i in range(args.n_per_combo):
                     f0 = rng.uniform(*f0_range)
                     formants = _sample_formants(formant_name, rng)
-                    signal = synth_vowel(f0, formants, BANDWIDTH, rng)
+                    if f0_name == "very_high":
+                        noise_kwargs = {
+                            name: rng.uniform(*bounds) for name, bounds in VERY_HIGH_F0_NOISE_RANGES.items()
+                        }
+                    else:
+                        noise_kwargs = {}
+                    signal = synth_vowel(f0, formants, BANDWIDTH, rng, **noise_kwargs)
                     file_path = out_dir / f"{combo_tag}_{i:04d}.wav"
                     sf.write(file_path, signal, SAMPLE_RATE)
                     writer.writerow(

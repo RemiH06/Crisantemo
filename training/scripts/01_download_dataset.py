@@ -15,8 +15,16 @@ al vuelo, tomando los primeros --max-rows/2 clips de cada género sin bajar el
 archivo completo a disco (los datasets completos pesan ~1.8GB y ~2GB; para
 una corrida de validación no hace falta bajarlos enteros).
 
+También soporta otros idiomas ya curados por género en MDC (ver
+LANGUAGE_DATASETS abajo: en-US, nl-NL, árabe por ahora), para comparar cómo
+se comportan las features acústicas por idioma/región, no solo por género
+(ver training/notebooks/feature_analysis.ipynb sección 6). Cada idioma nuevo
+necesita su propia aceptación de términos en el sitio web antes de que la API
+deje descargarlo, aunque ya se use la misma MDC_API_KEY.
+
 Uso:
     python scripts/01_download_dataset.py --max-rows 500
+    python scripts/01_download_dataset.py --lang en-us --max-rows 500
 """
 
 from __future__ import annotations
@@ -33,18 +41,43 @@ from common import RAW_DIR
 
 API_BASE = "https://mozilladatacollective.com/api"
 
-# (etiqueta de género tal como la espera GENDER_LABEL_MAP en common.py, dataset id de MDC)
-DEFAULT_DATASETS = [
-    ("female_feminine", "cmr3zunmk00flnt07p7ai9p43"),  # CV Scripted Speech 26.0 es-MX, mujeres
-    ("male_masculine", "cmr3jjevj0041nt07vb3sm35d"),  # CV Scripted Speech 26.0 es-MX, hombres
-]
+# (etiqueta de género tal como la espera GENDER_LABEL_MAP en common.py, dataset id de MDC),
+# por idioma. Todos son "Common Voice Scripted Speech 26.0" ya curados por MDC
+# Curators en pares macho/hembra. Antes de agregar un idioma nuevo aquí, hay
+# que aceptar los términos de CADA dataset desde mozilladatacollective.com
+# logueado con la cuenta dueña de MDC_API_KEY (la API no deja aceptarlos);
+# entrar a https://mozilladatacollective.com/datasets/<id> de cada uno.
+LANGUAGE_DATASETS: dict[str, list[tuple[str, str]]] = {
+    "es-mx": [
+        ("female_feminine", "cmr3zunmk00flnt07p7ai9p43"),  # CV Scripted Speech 26.0 es-MX, mujeres
+        ("male_masculine", "cmr3jjevj0041nt07vb3sm35d"),  # CV Scripted Speech 26.0 es-MX, hombres
+    ],
+    "en-us": [
+        ("female_feminine", "cmrt70j4z001qmm07nvfsmgmr"),  # CV Scripted Speech 26.0 en-US, mujeres
+        ("male_masculine", "cmrt6zbgx000vmm07hfuefigk"),  # CV Scripted Speech 26.0 en-US, hombres
+    ],
+    "nl-nl": [
+        ("female_feminine", "cmruvkoaj00b0md07fjxzw6x5"),  # CV Scripted Speech 26.0 nl-NL, mujeres
+        ("male_masculine", "cmruvkf8p00ajnx07rfn0ecv9"),  # CV Scripted Speech 26.0 nl-NL, hombres
+    ],
+    "ar": [
+        ("female_feminine", "cmrv0fgp00022nu077cdkkcny"),  # CV Scripted Speech 26.0 árabe, mujeres
+        ("male_masculine", "cmrv0f62m001wnu077iwrjbbo"),  # CV Scripted Speech 26.0 árabe, hombres
+    ],
+}
+DEFAULT_DATASETS = LANGUAGE_DATASETS["es-mx"]
 
 AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--lang", default="es-mx", help="Etiqueta para nombrar el manifest de salida")
+    parser.add_argument(
+        "--lang",
+        default="es-mx",
+        choices=sorted(LANGUAGE_DATASETS.keys()),
+        help="Qué par de datasets (ya curados por género) descargar; también nombra el manifest de salida.",
+    )
     parser.add_argument("--max-rows", type=int, default=500, help="Límite total de filas en el manifest")
     return parser.parse_args()
 
@@ -90,15 +123,16 @@ def main() -> None:
     if not token:
         raise SystemExit("Falta MDC_API_KEY en el entorno (agrégalo a tu .env)")
 
+    datasets = LANGUAGE_DATASETS[args.lang]
     manifest_path = RAW_DIR / f"manifest_{args.lang}.csv"
-    per_dataset_cap = max(1, args.max_rows // len(DEFAULT_DATASETS))
+    per_dataset_cap = max(1, args.max_rows // len(datasets))
 
     rows_written = 0
     with open(manifest_path, "w", newline="", encoding="utf-8") as manifest_file:
         writer = csv.writer(manifest_file)
         writer.writerow(["audio_path", "gender", "age", "client_id"])
 
-        for gender_label, dataset_id in DEFAULT_DATASETS:
+        for gender_label, dataset_id in datasets:
             print(f"Descargando {dataset_id} ({gender_label})...")
             download_url = _get_download_url(dataset_id, token)
             clips_dir = RAW_DIR / args.lang / gender_label
