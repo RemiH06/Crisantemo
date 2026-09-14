@@ -1,6 +1,6 @@
 [project]
 name = "crisantemo-shared"
-version = "0.1.0"
+version = "0.1.1"
 description = "Extracción de features acústicas compartida entre training y backend de Crisantemo"
 requires-python = ">=3.11"
 dependencies = [

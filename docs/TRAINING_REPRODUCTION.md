@@ -284,6 +284,16 @@ Detalle adicional: esta vez F3 no salió extremo (percentil 27-62%, normal), a d
 
 **Siguiente experimento propuesto, no implementado todavía:** ampliar `_dev_synthetic_decorrelated.py` para que los ejemplos adversariales de F0 extremo también bajen jitter/shimmer y suban HNR de forma correlacionada (no solo variar F0), en vez de dejar el ruido de síntesis fijo o aleatorio sin relación con qué tan extremo es el F0. Es la versión afinada, ahora validada con datos reales, del pendiente "correlacionar severidad de jitter/shimmer con el género" que ya estaba anotado en el cierre de 4.8.
 
+## 4.15. Implementado: fonación correlacionada con F0 extremo en `very_high`, mejora real en pruebas sintéticas
+
+Implementación del experimento propuesto en 4.14. Solo el rango `very_high` (280-400 Hz) de `F0_RANGES` en `_dev_synthetic_decorrelated.py` ahora sintetiza con `jitter_std`/`shimmer_std`/`noise_std` reducidos (`VERY_HIGH_F0_NOISE_RANGES`, rangos angostos calibrados empíricamente, no un valor fijo, para no repetir el error de "huella digital sintética" de 4.7) en vez de los defaults de `synth_vowel()` usados para `low`/`high`. `low`/`high` no se tocaron: el hallazgo de 4.14 fue específico al registro forzado extremo, no a cualquier actuación de voz.
+
+Regenerados los 3,000 ejemplos sintéticos decorrelacionados con esta lógica, mezclados igual que antes con los 5,000 reales (`manifest_es-mx.csv` truncado a los 5,000 reales antes de volver a pegar, para no duplicar la generación anterior), reentrenado con `--adversarial-weight 5` (el valor ya validado, no se tocó). Resultado en las métricas automáticas: accuracy general 82.6% (antes 81.7%, sin caída), prueba de estrés adversarial 85.1% (antes 85.5%, sin caída), peso de F0 30.9% (antes 31.3%). Ningún síntoma del desastre de peso 10 (sección 4.11): los casos de control sintéticos (voz masculina/femenina normal, sin extremos) siguen puntuando de forma sensata.
+
+**Prueba dirigida al problema real:** un caso sintético de control con F0=340Hz + formantes masculinos + ruido normal (no la fonación limpia) dio 17.1; el mismo caso con la fonación anormalmente limpia confirmada en 4.14 dio 10.4, **más confiadamente masculino, no menos**. Confirma que el modelo no aprendió "F0 alto = masculino" a secas (seguiría usando los formantes con ruido normal), sino la combinación específica F0 extremo + fonación limpia como señal adicional masculina cuando coincide con formantes masculinos.
+
+**Pendiente de confirmar con la grabación real** (aún no se ha vuelto a probar "aguda actuada" contra este modelo exportado). Antes de esto, esa combinación real (342Hz, jitter 0.63%, shimmer 3.89%, HNR 26.06, formantes que resultan ser más bien neutros esta vez) puntuaba muy femenino; falta la prueba real para confirmar si cruza. `models/crisantemo_v1.joblib` ya está exportado con este cambio.
+
 ## 5. Prueba de estrés manual (opcional, pero recomendada)
 
 Para confirmar que el modelo usa resonancia y no solo pitch, se generaron cuatro voces sintéticas de control cruzando pitch y formantes en direcciones opuestas, y se les pidió el score al modelo crudo (antes de calibrar):
